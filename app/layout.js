@@ -13,7 +13,15 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{__html:'window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);'}} />
+        <script dangerouslySetInnerHTML={{__html:`
+          (function(){
+            try{var t=localStorage.getItem('rad-theme');
+            if(t==='light'){document.documentElement.classList.remove('dark');document.documentElement.style.colorScheme='light'}
+            else{document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark'}
+            }catch(e){}
+            window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"){e.stopImmediatePropagation();e.preventDefault()}},true);
+          })();
+        `}} />
       </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>

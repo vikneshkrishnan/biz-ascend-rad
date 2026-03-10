@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, createContext, useContext, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useTheme } from 'next-themes'
+import { useCustomTheme } from './providers'
 import { toast } from 'sonner'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -28,9 +28,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { INDUSTRIES, SCREENER_SECTIONS, DIAGNOSTIC_PILLARS, MATURITY_BANDS, PILLAR_NAMES, FREE_EMAIL_DOMAINS, MONTHS } from '@/lib/constants'
+import { DEMO_PROFILE, DEMO_USERS, DEMO_PROJECTS, DEMO_STATS, DEMO_ACTIVITY, demoApiFetch } from '@/lib/mockData'
+
+// ===== DEMO MODE =====
+let _demoMode = false
+export function setDemoMode(v) { _demoMode = v }
+export function isDemoMode() { return _demoMode }
 
 // ===== API HELPER =====
 async function apiFetch(path, options = {}) {
+  if (_demoMode) {
+    await new Promise(r => setTimeout(r, 200 + Math.random() * 300)) // simulate latency
+    if (options.method === 'POST' || options.method === 'PUT' || options.method === 'PATCH' || options.method === 'DELETE') {
+      return { success: true }
+    }
+    return demoApiFetch(path)
+  }
   const { data: { session } } = await supabase.auth.getSession()
   const token = session?.access_token
   const fetchOptions = { method: options.method || 'GET', headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) } }
@@ -109,7 +122,7 @@ function PageSkeleton() {
 }
 
 // ===== LOGIN PAGE =====
-function LoginPage({ onSuccess }) {
+function LoginPage({ onSuccess, onDemo }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -152,6 +165,10 @@ function LoginPage({ onSuccess }) {
               <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={loading}>
                 {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Signing in...</> : 'Sign In'}
               </Button>
+              <div className="relative"><div className="absolute inset-0 flex items-center"><Separator /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div></div>
+              <Button type="button" variant="outline" className="w-full h-11" onClick={onDemo}>
+                <Eye className="w-4 h-4 mr-2" />Explore Demo
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -164,7 +181,7 @@ function LoginPage({ onSuccess }) {
 // ===== APP SHELL =====
 function AppShell({ children }) {
   const { profile, navigate, hash } = useAuth()
-  const { theme, setTheme } = useTheme()
+  const { isDark, toggle: toggleTheme } = useCustomTheme()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const isAdmin = profile?.role === 'admin'
@@ -176,6 +193,12 @@ function AppShell({ children }) {
   ]
 
   async function handleLogout() {
+    if (isDemoMode()) {
+      setDemoMode(false)
+      window.location.hash = '/login'
+      window.location.reload()
+      return
+    }
     await supabase.auth.signOut()
     navigate('/login')
   }
@@ -236,9 +259,10 @@ function AppShell({ children }) {
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="rounded-xl">
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl" data-testid="theme-toggle">
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </Button>
+            {isDemoMode() && <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">Demo</Badge>}
             <Badge variant="outline" className="capitalize hidden sm:flex">{profile?.role}</Badge>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
               <LogOut className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Logout</span>
@@ -1122,13 +1146,24 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [demoActive, setDemoActive] = useState(false)
   const { hash, navigate } = useRouter()
+
+  function enterDemoMode() {
+    setDemoMode(true)
+    setDemoActive(true)
+    setUser({ id: 'demo-auth-001', email: 'admin@bizascend.com' })
+    setProfile(DEMO_PROFILE)
+    setLoading(false)
+    navigate('/dashboard')
+    toast.success('Welcome to Demo Mode!', { description: 'Explore the full platform with sample data' })
+  }
 
   useEffect(() => {
     checkAuth()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') checkAuth()
-      if (event === 'SIGNED_OUT') { setUser(null); setProfile(null); navigate('/login') }
+      if (event === 'SIGNED_OUT') { setUser(null); setProfile(null); setDemoMode(false); setDemoActive(false); navigate('/login') }
     })
     return () => subscription?.unsubscribe()
   }, [])
@@ -1142,11 +1177,11 @@ export default function App() {
         setProfile(profileData)
         if (hash === '/login' || hash === '') navigate('/dashboard')
       } else {
-        if (!hash.startsWith('/assess/')) navigate('/login')
+        if (!hash.startsWith('/assess/') && !demoActive) navigate('/login')
       }
     } catch (e) {
       console.error('Auth check error:', e)
-      if (!hash.startsWith('/assess/')) navigate('/login')
+      if (!hash.startsWith('/assess/') && !demoActive) navigate('/login')
     } finally { setLoading(false) }
   }
 
@@ -1154,8 +1189,8 @@ export default function App() {
   const assessMatch = hash.match(/^\/assess\/([^/]+)/)
   if (assessMatch) return <PublicAssessPage token={assessMatch[1]} />
 
-  if (loading) return <LoadingScreen />
-  if (hash === '/login' || !user) return <LoginPage onSuccess={checkAuth} />
+  if (loading && !demoActive) return <LoadingScreen />
+  if ((hash === '/login' || !user) && !demoActive) return <LoginPage onSuccess={checkAuth} onDemo={enterDemoMode} />
 
   const route = matchRoute(hash)
 
