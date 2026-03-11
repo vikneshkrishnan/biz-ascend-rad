@@ -9,7 +9,7 @@ import {
   ChevronRight, ArrowLeft, Activity, CheckCircle2, Clock, AlertTriangle, Copy,
   PanelLeftClose, PanelLeftOpen, MoreVertical, Building2, FileText, Link2,
   TrendingUp, Shield, Trash2, Edit, BarChart3, Eye, ChevronLeft, Menu, X,
-  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download
+  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download, FileSpreadsheet
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -1095,6 +1095,85 @@ function ScoresPage({ id }) {
     }
   }
 
+  function exportToCSV() {
+    if (!scores || !project) {
+      toast.error('No data to export')
+      return
+    }
+
+    const companyName = project.company_name || 'Company'
+    const rows = []
+    
+    // Header row
+    rows.push(['Biz Ascend RAD - Diagnostic Export'])
+    rows.push(['Company', companyName])
+    rows.push(['Industry', project.industry || ''])
+    rows.push(['Export Date', new Date().toLocaleDateString()])
+    rows.push([])
+    
+    // Overall scores
+    rows.push(['=== OVERALL SCORES ==='])
+    rows.push(['RAD Score', scores.radScore])
+    rows.push(['Maturity Band', scores.maturityBand])
+    rows.push(['Primary Constraint', scores.primaryConstraint?.name || ''])
+    rows.push([])
+    
+    // Pillar scores
+    rows.push(['=== PILLAR SCORES ==='])
+    rows.push(['Pillar', 'Score', 'Average', 'Status'])
+    Object.entries(scores.pillarScores || {}).forEach(([pid, data]) => {
+      const status = data.avg >= 4 ? 'Strong' : data.avg >= 3 ? 'Developing' : 'At Risk'
+      rows.push([PILLAR_NAMES[pid] || pid, data.score, data.avg?.toFixed(2), status])
+    })
+    rows.push([])
+    
+    // RAPS
+    if (scores.raps) {
+      rows.push(['=== REVENUE ACHIEVEMENT PROBABILITY (RAPS) ==='])
+      rows.push(['RAPS Score', `${scores.raps.score}%`])
+      rows.push(['Revenue Target', `$${(scores.raps.revenueTarget || 0).toLocaleString()}`])
+      rows.push(['Already Invoiced', `$${(scores.raps.revenueInvoiced || 0).toLocaleString()}`])
+      rows.push(['Remaining', `$${(scores.raps.revenueRemaining || 0).toLocaleString()}`])
+      rows.push(['Months Left', scores.raps.monthsRemaining])
+      rows.push([])
+    }
+    
+    // Assessment history
+    if (project.assessments?.length > 1) {
+      rows.push(['=== ASSESSMENT HISTORY ==='])
+      rows.push(['Assessment #', 'RAD Score', 'RAPS %', 'Maturity Band', 'Completed'])
+      project.assessments.filter(a => a.scores).forEach(a => {
+        rows.push([
+          a.assessment_number,
+          a.scores?.radScore || '',
+          a.scores?.raps?.score ? `${a.scores.raps.score}%` : '',
+          a.scores?.maturityBand || '',
+          a.completed_at ? new Date(a.completed_at).toLocaleDateString() : ''
+        ])
+      })
+    }
+    
+    // Convert to CSV string
+    const csvContent = rows.map(row => row.map(cell => {
+      const str = String(cell ?? '')
+      return str.includes(',') || str.includes('"') || str.includes('\n') 
+        ? `"${str.replace(/"/g, '""')}"` 
+        : str
+    }).join(',')).join('\n')
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${companyName.replace(/\s+/g, '_')}_RAD_Scores.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast.success('CSV exported!')
+  }
+
   if (isLoading) return <PageSkeleton />
   if (!scores) return <div className="text-center py-20"><p className="text-muted-foreground">No scores available</p></div>
 
@@ -1124,6 +1203,9 @@ function ScoresPage({ id }) {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <Button variant="ghost" onClick={() => navigate(`/projects/${id}`)}><ArrowLeft className="w-4 h-4 mr-2" />Back to Project</Button>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportToCSV} data-testid="export-csv-btn">
+            <FileSpreadsheet className="w-4 h-4 mr-2" />Export CSV
+          </Button>
           <Button variant="outline" onClick={loadReport} data-testid="view-report-btn">
             <FileText className="w-4 h-4 mr-2" />View Report
           </Button>

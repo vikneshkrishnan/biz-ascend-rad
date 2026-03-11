@@ -6,6 +6,54 @@ test.describe('Scores Page and AI Report Generation', () => {
     await dismissToasts(page);
   });
 
+  test('Export CSV button is visible and triggers download', async ({ page }) => {
+    await enterDemoMode(page);
+    
+    // Navigate directly to scores page for Acme Corporation (proj-001)
+    await page.goto('/#/projects/proj-001/scores');
+    await page.waitForLoadState('domcontentloaded');
+    
+    // Wait for the scores to load
+    await expect(page.getByText('RAD Growth System Score')).toBeVisible({ timeout: 10000 });
+    
+    // Verify Export CSV button exists
+    const exportCsvBtn = page.getByTestId('export-csv-btn');
+    await expect(exportCsvBtn).toBeVisible();
+    await expect(exportCsvBtn).toContainText('Export CSV');
+    
+    // Verify button is enabled
+    await expect(exportCsvBtn).toBeEnabled();
+    
+    // Set up download listener before clicking
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+    
+    // Click Export CSV
+    await exportCsvBtn.click();
+    
+    // Wait for download and verify
+    const download = await downloadPromise;
+    
+    // Verify the filename contains CSV extension and company name
+    const filename = download.suggestedFilename();
+    expect(filename).toMatch(/\.csv$/i);
+    expect(filename).toContain('Acme');
+    
+    // Read the downloaded file content
+    const content = await download.path().then(async (path) => {
+      if (path) {
+        const fs = await import('fs');
+        return fs.readFileSync(path, 'utf-8');
+      }
+      return '';
+    });
+    
+    // Verify CSV contains expected data sections
+    expect(content).toContain('Biz Ascend RAD');
+    expect(content).toContain('RAD Score');
+    expect(content).toContain('PILLAR SCORES');
+    expect(content).toContain('Acme Corporation');
+  });
+
   test('Scores page shows RAD score, pillar breakdown, and RAPS', async ({ page }) => {
     await enterDemoMode(page);
     
