@@ -93,12 +93,12 @@ function matchRoute(hash) {
 
 // ===== UTILITY COMPONENTS =====
 const CARD_COLORS = [
-  'bg-slate-800 dark:bg-card text-white dark:text-foreground border-slate-700 dark:border-primary/20',
-  'bg-slate-800 dark:bg-card text-white dark:text-foreground border-slate-700 dark:border-primary/20',
-  'bg-slate-800 dark:bg-card text-white dark:text-foreground border-slate-700 dark:border-primary/20',
-  'bg-slate-800 dark:bg-card text-white dark:text-foreground border-slate-700 dark:border-primary/20',
-  'bg-slate-800 dark:bg-card text-white dark:text-foreground border-slate-700 dark:border-primary/20',
-  'bg-slate-800 dark:bg-card text-white dark:text-foreground border-slate-700 dark:border-primary/20',
+  'bg-blue-700 text-white dark:bg-card dark:text-card-foreground border-blue-800 dark:border-primary/20',
+  'bg-emerald-700 text-white dark:bg-card dark:text-card-foreground border-emerald-800 dark:border-primary/20',
+  'bg-orange-600 text-white dark:bg-card dark:text-card-foreground border-orange-700 dark:border-primary/20',
+  'bg-red-700 text-white dark:bg-card dark:text-card-foreground border-red-800 dark:border-primary/20',
+  'bg-violet-700 text-white dark:bg-card dark:text-card-foreground border-violet-800 dark:border-primary/20',
+  'bg-sky-700 text-white dark:bg-card dark:text-card-foreground border-sky-800 dark:border-primary/20',
 ]
 
 function StatusBadge({ status }) {
