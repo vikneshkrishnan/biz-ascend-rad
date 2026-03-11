@@ -931,7 +931,43 @@ function DiagnosticPage({ id }) {
 // ===== SCORES PAGE =====
 function ScoresPage({ id }) {
   const { navigate } = useAuth()
+  const queryClient = useQueryClient()
   const { data: scores, isLoading } = useQuery({ queryKey: ['scores', id], queryFn: () => apiFetch(`/projects/${id}/scores`) })
+  const { data: reportData, isLoading: reportLoading, refetch: refetchReport } = useQuery({ 
+    queryKey: ['report', id], 
+    queryFn: () => apiFetch(`/projects/${id}/report`),
+    enabled: false, // Don't auto-fetch
+    retry: false
+  })
+  const [generating, setGenerating] = useState(false)
+  const [showReport, setShowReport] = useState(false)
+  const [report, setReport] = useState(null)
+
+  async function generateReport() {
+    setGenerating(true)
+    try {
+      const result = await apiFetch(`/projects/${id}/report/generate`, { method: 'POST' })
+      setReport(result)
+      setShowReport(true)
+      toast.success('Report generated successfully!')
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+    } catch (err) {
+      toast.error(err.message || 'Failed to generate report')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function loadReport() {
+    try {
+      const result = await apiFetch(`/projects/${id}/report`)
+      setReport(result)
+      setShowReport(true)
+    } catch (err) {
+      // No report yet, need to generate
+      toast.info('No report found. Click "Generate Report" to create one.')
+    }
+  }
 
   if (isLoading) return <PageSkeleton />
   if (!scores) return <div className="text-center py-20"><p className="text-muted-foreground">No scores available</p></div>
@@ -942,7 +978,17 @@ function ScoresPage({ id }) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <Button variant="ghost" onClick={() => navigate(`/projects/${id}`)}><ArrowLeft className="w-4 h-4 mr-2" />Back to Project</Button>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={() => navigate(`/projects/${id}`)}><ArrowLeft className="w-4 h-4 mr-2" />Back to Project</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={loadReport} data-testid="view-report-btn">
+            <FileText className="w-4 h-4 mr-2" />View Report
+          </Button>
+          <Button onClick={generateReport} disabled={generating} data-testid="generate-report-btn">
+            {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</> : <><Zap className="w-4 h-4 mr-2" />Generate AI Report</>}
+          </Button>
+        </div>
+      </div>
       {/* Overall Score */}
       <Card className="border-2 overflow-hidden">
         <div className={`h-2 ${bandColorClass[bandColor]}`} />
@@ -1000,6 +1046,120 @@ function ScoresPage({ id }) {
           </CardContent>
         </Card>
       )}
+      {/* AI Report Dialog */}
+      <Dialog open={showReport} onOpenChange={setShowReport}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" />AI-Generated Diagnostic Report</DialogTitle>
+            <DialogDescription>Powered by Claude AI</DialogDescription>
+          </DialogHeader>
+          {report && (
+            <div className="space-y-6 py-4">
+              {/* Executive Summary */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold flex items-center gap-2"><Award className="w-5 h-5 text-primary" />Executive Summary</h3>
+                <div className="p-4 bg-muted/50 rounded-xl text-sm leading-relaxed whitespace-pre-wrap">{report.executive_summary}</div>
+              </div>
+              {/* Pillar Narratives */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-bold">Pillar Analysis</h3>
+                {report.pillar_narratives && Object.entries(report.pillar_narratives).map(([pid, narrative]) => (
+                  <div key={pid} className="p-4 border rounded-xl">
+                    <h4 className="font-semibold text-primary mb-2">{PILLAR_NAMES[pid]}</h4>
+                    <p className="text-sm text-muted-foreground">{narrative}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Positioning Assessment */}
+              {report.positioning_assessment && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold flex items-center gap-2"><Shield className="w-5 h-5 text-primary" />Positioning Assessment</h3>
+                  <div className="p-4 bg-muted/50 rounded-xl text-sm leading-relaxed whitespace-pre-wrap">{report.positioning_assessment}</div>
+                </div>
+              )}
+              {/* Strategic Moat */}
+              {report.strategic_moat_narrative && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold">Strategic Moat Score: {report.strategic_moat_score}/10</h3>
+                  <div className="p-4 bg-muted/50 rounded-xl text-sm leading-relaxed">{report.strategic_moat_narrative}</div>
+                </div>
+              )}
+              {/* RAPS Narrative */}
+              {report.raps_narrative && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" />Revenue Achievement Analysis</h3>
+                  <div className="p-4 bg-muted/50 rounded-xl text-sm leading-relaxed whitespace-pre-wrap">{report.raps_narrative}</div>
+                  {report.raps_improvement_scenario && (
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl text-sm">
+                      <p className="font-semibold text-green-700 dark:text-green-400 mb-1">Improvement Scenario</p>
+                      <p className="text-green-600 dark:text-green-300">{report.raps_improvement_scenario}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Action Plan */}
+              {report.action_plan && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-bold flex items-center gap-2"><Target className="w-5 h-5 text-primary" />30-60-90 Day Action Plan</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
+                      <h4 className="font-semibold text-red-700 dark:text-red-400 mb-2">{report.action_plan.phase1_title}</h4>
+                      <ul className="space-y-1">{(report.action_plan.phase1_items || []).map((item, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2"><span className="text-red-500 mt-1">•</span>{item}</li>
+                      ))}</ul>
+                    </div>
+                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                      <h4 className="font-semibold text-amber-700 dark:text-amber-400 mb-2">{report.action_plan.phase2_title}</h4>
+                      <ul className="space-y-1">{(report.action_plan.phase2_items || []).map((item, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2"><span className="text-amber-500 mt-1">•</span>{item}</li>
+                      ))}</ul>
+                    </div>
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+                      <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">{report.action_plan.phase3_title}</h4>
+                      <ul className="space-y-1">{(report.action_plan.phase3_items || []).map((item, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2"><span className="text-green-500 mt-1">•</span>{item}</li>
+                      ))}</ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Market Report */}
+              {report.market_report?.countries?.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-bold flex items-center gap-2"><Gauge className="w-5 h-5 text-primary" />Market Opportunity Analysis</h3>
+                  {report.market_report.countries.map((country, ci) => (
+                    <Card key={ci} className="border">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <span>{country.name}</span>
+                          <Badge variant={country.growth_propensity === 'High' ? 'default' : country.growth_propensity === 'Medium-High' ? 'secondary' : 'outline'}>{country.growth_propensity} Growth</Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {country.dimensions?.map((dim, di) => (
+                          <div key={di}>
+                            <p className="text-sm font-medium">{dim.name}</p>
+                            <ul className="text-xs text-muted-foreground space-y-0.5 ml-3">{(dim.findings || []).map((f, fi) => <li key={fi}>• {f}</li>)}</ul>
+                          </div>
+                        ))}
+                        <div className="pt-2 border-t text-sm">
+                          <p><span className="font-medium">Key Drivers:</span> {country.key_drivers}</p>
+                          <p><span className="font-medium">Risks:</span> {country.risks}</p>
+                          <p><span className="font-medium">Strategic Implications:</span> {country.strategic_implications}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground text-center pt-4">Generated {report.generated_at ? new Date(report.generated_at).toLocaleString() : 'recently'}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReport(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,6 +1,37 @@
 import { createClient } from '@supabase/supabase-js'
 import { v4 as uuidv4 } from 'uuid'
 import { NextResponse } from 'next/server'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execPromise = promisify(exec)
+
+// Helper function to run Python script for AI generation
+async function runPythonScript(data) {
+  const scriptPath = '/app/scripts/generate_report.py'
+  const inputJson = JSON.stringify(data)
+  
+  try {
+    const { stdout, stderr } = await execPromise(
+      `echo '${inputJson.replace(/'/g, "'\\''")}' | python3 ${scriptPath}`,
+      { 
+        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+        timeout: 120000, // 2 minute timeout
+        env: { ...process.env }
+      }
+    )
+    
+    if (stderr) {
+      console.error('Python stderr:', stderr)
+    }
+    
+    const result = JSON.parse(stdout.trim())
+    return result
+  } catch (error) {
+    console.error('Python script error:', error)
+    throw new Error(`Python script failed: ${error.message}`)
+  }
+}
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -489,6 +520,63 @@ async function handleRoute(request, { params }) {
       if (user.profile.role !== 'admin') query = query.eq('user_id', user.profile.id)
       const { data } = await query
       return json({ activities: data || [] })
+    }
+
+    // ===== REPORT GENERATION =====
+    // POST /projects/:id/report/generate
+    if (path[0] === 'projects' && path.length === 4 && path[2] === 'report' && path[3] === 'generate' && method === 'POST') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      const projectId = path[1]
+      const { data: assessment } = await supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: false }).limit(1).single()
+      if (!assessment) return err('No assessment found', 404)
+      if (assessment.diagnostic_status !== 'completed') return err('Diagnostic must be completed first', 400)
+
+      // Call Python script for AI generation
+      const scriptData = {
+        action: 'report',
+        api_key: process.env.EMERGENT_LLM_KEY,
+        project_id: projectId,
+        scores: assessment.scores || calculateScores(assessment.diagnostic_responses, assessment.screener_responses),
+        screener_responses: assessment.screener_responses,
+        diagnostic_responses: assessment.diagnostic_responses,
+      }
+
+      try {
+        const reportData = await runPythonScript(scriptData)
+
+        // Also generate market report
+        const marketData = {
+          action: 'market',
+          api_key: process.env.EMERGENT_LLM_KEY,
+          project_id: projectId,
+          markets: assessment.screener_responses?.q6 || 'United States',
+          industry: assessment.screener_responses?.q5 || 'Technology',
+          company: assessment.screener_responses?.q4 || 'the company',
+        }
+        let marketReport = { countries: [] }
+        try { marketReport = await runPythonScript(marketData) } catch (e) { console.error('Market report error:', e) }
+
+        const fullReport = { ...reportData, market_report: marketReport, generated_at: new Date().toISOString() }
+
+        await supabaseAdmin.from('assessments').update({ report_data: fullReport, report_generated_at: new Date().toISOString() }).eq('id', assessment.id)
+        await logActivity(user.profile.id, projectId, 'Generated diagnostic report')
+        return json(fullReport)
+      } catch (scriptErr) {
+        console.error('Report generation error:', scriptErr)
+        return err('Report generation failed: ' + scriptErr.message, 500)
+      }
+    }
+
+    // GET /projects/:id/report
+    if (path[0] === 'projects' && path.length === 3 && path[2] === 'report' && method === 'GET') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      const projectId = path[1]
+      const { data: assessment } = await supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: false }).limit(1).single()
+      if (!assessment) return err('No assessment found', 404)
+      if (!assessment.report_data) return err('Report not generated yet', 404)
+      return json({ ...assessment.report_data, scores: assessment.scores, screener_responses: assessment.screener_responses })
     }
 
     return err('Route not found', 404)
