@@ -660,18 +660,18 @@ function ProjectDetailPage({ id }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className={`border-2 ${CARD_COLORS[0]}`}>
           <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm">Screener</h3><StatusBadge status={screenerStatus} /></div>
-            <p className="text-xs text-muted-foreground mb-3">20 questions about company context</p>
-            <Button size="sm" className="w-full" variant={screenerStatus === 'completed' ? 'outline' : 'default'} onClick={() => navigate(`/projects/${id}/screener`)}>
+            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm text-white dark:text-foreground">Screener</h3><StatusBadge status={screenerStatus} /></div>
+            <p className="text-xs text-white/70 dark:text-muted-foreground mb-3">20 questions about company context</p>
+            <Button size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 dark:bg-background dark:text-foreground dark:border-border dark:hover:bg-muted" variant="outline" onClick={() => navigate(`/projects/${id}/screener`)}>
               {screenerStatus === 'not_started' ? 'Start Screener' : screenerStatus === 'in_progress' ? 'Continue Screener' : 'View Responses'}
             </Button>
           </CardContent>
         </Card>
         <Card className={`border-2 ${CARD_COLORS[1]}`}>
           <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm">Diagnostic</h3><StatusBadge status={diagnosticStatus} /></div>
-            <p className="text-xs text-muted-foreground mb-3">7 pillars of growth readiness</p>
-            <Button size="sm" className="w-full" variant={diagnosticStatus === 'completed' ? 'outline' : 'default'}
+            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm text-white dark:text-foreground">Diagnostic</h3><StatusBadge status={diagnosticStatus} /></div>
+            <p className="text-xs text-white/70 dark:text-muted-foreground mb-3">7 pillars of growth readiness</p>
+            <Button size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 dark:bg-background dark:text-foreground dark:border-border dark:hover:bg-muted" variant="outline"
               disabled={screenerStatus !== 'completed'}
               onClick={() => navigate(`/projects/${id}/diagnostic`)}>
               {screenerStatus !== 'completed' ? 'Complete Screener First' : diagnosticStatus === 'not_started' ? 'Start Diagnostic' : diagnosticStatus === 'in_progress' ? 'Continue Diagnostic' : 'View Responses'}
@@ -680,9 +680,9 @@ function ProjectDetailPage({ id }) {
         </Card>
         <Card className={`border-2 ${CARD_COLORS[2]}`}>
           <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm">Scores & Report</h3>{scores ? <StatusBadge status="completed" /> : <StatusBadge status="not_started" />}</div>
-            <p className="text-xs text-muted-foreground mb-3">{scores ? `RAD Score: ${scores.radScore}` : 'Complete diagnostic to view'}</p>
-            <Button size="sm" className="w-full" variant={scores ? 'default' : 'outline'} disabled={!scores} onClick={() => navigate(`/projects/${id}/scores`)}>
+            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm text-white dark:text-foreground">Scores & Report</h3>{scores ? <StatusBadge status="completed" /> : <StatusBadge status="not_started" />}</div>
+            <p className="text-xs text-white/70 dark:text-muted-foreground mb-3">{scores ? `RAD Score: ${scores.radScore}` : 'Complete diagnostic to view'}</p>
+            <Button size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 dark:bg-background dark:text-foreground dark:border-border dark:hover:bg-muted" variant="outline" disabled={!scores} onClick={() => navigate(`/projects/${id}/scores`)}>
               {scores ? 'View Scores' : 'Not Available Yet'}
             </Button>
           </CardContent>
