@@ -9,7 +9,7 @@ import {
   ChevronRight, ArrowLeft, Activity, CheckCircle2, Clock, AlertTriangle, Copy,
   PanelLeftClose, PanelLeftOpen, MoreVertical, Building2, FileText, Link2,
   TrendingUp, Shield, Trash2, Edit, BarChart3, Eye, ChevronLeft, Menu, X,
-  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2
+  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
 import { INDUSTRIES, SCREENER_SECTIONS, DIAGNOSTIC_PILLARS, MATURITY_BANDS, PILLAR_NAMES, FREE_EMAIL_DOMAINS, MONTHS } from '@/lib/constants'
 import { DEMO_PROFILE, DEMO_USERS, DEMO_PROJECTS, DEMO_STATS, DEMO_ACTIVITY, demoApiFetch } from '@/lib/mockData'
 
@@ -933,13 +934,9 @@ function ScoresPage({ id }) {
   const { navigate } = useAuth()
   const queryClient = useQueryClient()
   const { data: scores, isLoading } = useQuery({ queryKey: ['scores', id], queryFn: () => apiFetch(`/projects/${id}/scores`) })
-  const { data: reportData, isLoading: reportLoading, refetch: refetchReport } = useQuery({ 
-    queryKey: ['report', id], 
-    queryFn: () => apiFetch(`/projects/${id}/report`),
-    enabled: false, // Don't auto-fetch
-    retry: false
-  })
+  const { data: project } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
   const [generating, setGenerating] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [report, setReport] = useState(null)
 
@@ -964,8 +961,35 @@ function ScoresPage({ id }) {
       setReport(result)
       setShowReport(true)
     } catch (err) {
-      // No report yet, need to generate
       toast.info('No report found. Click "Generate Report" to create one.')
+    }
+  }
+
+  async function downloadPdf() {
+    setDownloadingPdf(true)
+    try {
+      const result = await apiFetch(`/projects/${id}/report/pdf`)
+      // Decode base64 and download
+      const byteCharacters = atob(result.pdf)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const byteArray = new Uint8Array(byteNumbers)
+      const blob = new Blob([byteArray], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = result.filename || 'RAD_Report.pdf'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('PDF downloaded!')
+    } catch (err) {
+      toast.error(err.message || 'Failed to download PDF. Generate report first.')
+    } finally {
+      setDownloadingPdf(false)
     }
   }
 
@@ -975,20 +999,41 @@ function ScoresPage({ id }) {
   const bandColor = scores.maturityBand?.includes('Strong') ? 'green' : scores.maturityBand?.includes('Developing') ? 'amber' : scores.maturityBand?.includes('Fragile') ? 'orange' : 'red'
   const bandColorClass = { green: 'bg-green-500', amber: 'bg-amber-500', orange: 'bg-orange-500', red: 'bg-red-500' }
   const trafficLight = (avg) => avg >= 4 ? 'bg-green-500' : avg >= 3 ? 'bg-amber-500' : 'bg-red-500'
+  
+  // Prepare chart data for pillar radar
+  const radarData = Object.entries(scores.pillarScores || {}).map(([pid, data]) => ({
+    pillar: PILLAR_NAMES[pid]?.split(' ')[0] || pid,
+    fullName: PILLAR_NAMES[pid],
+    score: data.score,
+    fullMark: 100
+  }))
+
+  // Prepare trend data if multiple assessments exist
+  const assessments = project?.assessments || []
+  const trendData = assessments.filter(a => a.scores).map(a => ({
+    name: `#${a.assessment_number}`,
+    radScore: a.scores?.radScore || 0,
+    raps: a.scores?.raps?.score || 0,
+    date: a.completed_at ? new Date(a.completed_at).toLocaleDateString() : ''
+  })).reverse()
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto space-y-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <Button variant="ghost" onClick={() => navigate(`/projects/${id}`)}><ArrowLeft className="w-4 h-4 mr-2" />Back to Project</Button>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={loadReport} data-testid="view-report-btn">
             <FileText className="w-4 h-4 mr-2" />View Report
+          </Button>
+          <Button variant="outline" onClick={downloadPdf} disabled={downloadingPdf} data-testid="download-pdf-btn">
+            {downloadingPdf ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Downloading...</> : <><Download className="w-4 h-4 mr-2" />Download PDF</>}
           </Button>
           <Button onClick={generateReport} disabled={generating} data-testid="generate-report-btn">
             {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</> : <><Zap className="w-4 h-4 mr-2" />Generate AI Report</>}
           </Button>
         </div>
       </div>
+      
       {/* Overall Score */}
       <Card className="border-2 overflow-hidden">
         <div className={`h-2 ${bandColorClass[bandColor]}`} />
@@ -1004,7 +1049,85 @@ function ScoresPage({ id }) {
           )}
         </CardContent>
       </Card>
-      {/* Pillar Heatmap */}
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pillar Radar Chart */}
+        <Card className="border-2">
+          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="w-5 h-5 text-primary" />Pillar Performance</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radarData}>
+                  <PolarGrid stroke="hsl(var(--border))" />
+                  <PolarAngleAxis dataKey="pillar" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
+                  <Radar name="Score" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} strokeWidth={2} />
+                  <Tooltip content={({ payload }) => payload?.[0] ? (
+                    <div className="bg-popover border rounded-lg p-2 shadow-lg">
+                      <p className="font-medium text-sm">{payload[0].payload.fullName}</p>
+                      <p className="text-primary font-bold">{payload[0].value}/100</p>
+                    </div>
+                  ) : null} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Score Trend Chart */}
+        {trendData.length > 1 ? (
+          <Card className="border-2">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="w-5 h-5 text-primary" />Score Trend</CardTitle></CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                    <YAxis domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                    <Tooltip content={({ payload, label }) => payload?.length ? (
+                      <div className="bg-popover border rounded-lg p-3 shadow-lg">
+                        <p className="font-medium mb-2">Assessment {label}</p>
+                        {payload.map((p, i) => (
+                          <p key={i} style={{ color: p.color }} className="text-sm">{p.name}: <span className="font-bold">{p.value}</span></p>
+                        ))}
+                      </div>
+                    ) : null} />
+                    <Legend />
+                    <Line type="monotone" dataKey="radScore" name="RAD Score" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 6 }} activeDot={{ r: 8 }} />
+                    <Line type="monotone" dataKey="raps" name="RAPS %" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-2">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="w-5 h-5 text-primary" />Pillar Scores</CardTitle></CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={radarData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                    <YAxis type="category" dataKey="pillar" width={80} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
+                    <Tooltip content={({ payload }) => payload?.[0] ? (
+                      <div className="bg-popover border rounded-lg p-2 shadow-lg">
+                        <p className="font-medium text-sm">{payload[0].payload.fullName}</p>
+                        <p className="text-primary font-bold">{payload[0].value}/100</p>
+                      </div>
+                    ) : null} />
+                    <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Pillar Details */}
       <Card className="border-2">
         <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" />Diagnostic Overview</CardTitle></CardHeader>
         <CardContent>
@@ -1028,6 +1151,7 @@ function ScoresPage({ id }) {
           })}</div>
         </CardContent>
       </Card>
+
       {/* RAPS */}
       {scores.raps && (
         <Card className="border-2">
@@ -1046,6 +1170,7 @@ function ScoresPage({ id }) {
           </CardContent>
         </Card>
       )}
+
       {/* AI Report Dialog */}
       <Dialog open={showReport} onOpenChange={setShowReport}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1155,7 +1280,10 @@ function ScoresPage({ id }) {
               <p className="text-xs text-muted-foreground text-center pt-4">Generated {report.generated_at ? new Date(report.generated_at).toLocaleString() : 'recently'}</p>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={downloadPdf} disabled={downloadingPdf}>
+              {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Download PDF
+            </Button>
             <Button variant="outline" onClick={() => setShowReport(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>

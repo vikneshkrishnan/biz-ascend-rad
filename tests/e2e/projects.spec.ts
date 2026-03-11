@@ -31,12 +31,15 @@ test.describe('Projects List and Navigation', () => {
     const projectsNav = page.locator('button', { hasText: 'Projects' });
     await projectsNav.click();
     
-    // Click on a completed project (Acme Corporation)
-    const projectCard = page.locator('[class*="Card"]', { hasText: 'Acme Corporation' });
-    await projectCard.first().click();
+    // Wait for projects to load
+    await expect(page.locator('h1')).toContainText('Projects');
+    
+    // Click on a completed project (Acme Corporation) - use text locator instead of card class
+    const projectCard = page.getByText('Acme Corporation', { exact: false }).first();
+    await projectCard.click();
     
     // Verify project detail page
-    await expect(page.getByText('Acme Corporation')).toBeVisible();
+    await expect(page.getByText('Acme Corporation').first()).toBeVisible();
     await expect(page.getByText('SaaS / Software Platforms')).toBeVisible();
     
     // Verify assessment cards are visible
@@ -52,9 +55,12 @@ test.describe('Projects List and Navigation', () => {
     const projectsNav = page.locator('button', { hasText: 'Projects' });
     await projectsNav.click();
     
+    // Wait for projects to load
+    await expect(page.locator('h1')).toContainText('Projects');
+    
     // Click on Acme Corporation (completed project with scores)
-    const projectCard = page.locator('[class*="Card"]', { hasText: 'Acme Corporation' });
-    await projectCard.first().click();
+    const projectCard = page.getByText('Acme Corporation', { exact: false }).first();
+    await projectCard.click();
     
     // Click View Scores button
     const viewScoresBtn = page.getByRole('button', { name: 'View Scores' });

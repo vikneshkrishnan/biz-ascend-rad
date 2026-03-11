@@ -33,6 +33,33 @@ async function runPythonScript(data) {
   }
 }
 
+// Helper function to run PDF generation script
+async function runPdfScript(data) {
+  const scriptPath = '/app/scripts/generate_pdf.py'
+  const inputJson = JSON.stringify(data)
+  
+  try {
+    const { stdout, stderr } = await execPromise(
+      `echo '${inputJson.replace(/'/g, "'\\''")}' | python3 ${scriptPath}`,
+      { 
+        maxBuffer: 1024 * 1024 * 50, // 50MB buffer for PDF
+        timeout: 60000, // 1 minute timeout
+        env: { ...process.env }
+      }
+    )
+    
+    if (stderr) {
+      console.error('PDF stderr:', stderr)
+    }
+    
+    const result = JSON.parse(stdout.trim())
+    return result
+  } catch (error) {
+    console.error('PDF script error:', error)
+    throw new Error(`PDF generation failed: ${error.message}`)
+  }
+}
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -577,6 +604,31 @@ async function handleRoute(request, { params }) {
       if (!assessment) return err('No assessment found', 404)
       if (!assessment.report_data) return err('Report not generated yet', 404)
       return json({ ...assessment.report_data, scores: assessment.scores, screener_responses: assessment.screener_responses })
+    }
+
+    // GET /projects/:id/report/pdf - Generate PDF download
+    if (path[0] === 'projects' && path.length === 4 && path[2] === 'report' && path[3] === 'pdf' && method === 'GET') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      const projectId = path[1]
+      const { data: assessment } = await supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: false }).limit(1).single()
+      if (!assessment) return err('No assessment found', 404)
+      if (!assessment.report_data) return err('Report not generated yet. Generate AI report first.', 404)
+
+      const pdfData = {
+        scores: assessment.scores,
+        report_data: assessment.report_data,
+        screener_responses: assessment.screener_responses,
+        generated_at: assessment.report_data.generated_at || new Date().toISOString()
+      }
+
+      try {
+        const pdfResult = await runPdfScript(pdfData)
+        return json(pdfResult)
+      } catch (pdfErr) {
+        console.error('PDF generation error:', pdfErr)
+        return err('PDF generation failed: ' + pdfErr.message, 500)
+      }
     }
 
     return err('Route not found', 404)

@@ -1,0 +1,58 @@
+{
+  "summary": "Update mode testing - Fixed failing test specs and added new tests for PDF download, radar chart, and bar chart features. All 16 E2E tests pass.",
+  "mode": "update",
+  "baseline_commit": "35f058448ca617280272b243822200e1fbd9f4cb",
+  "head_commit": "5a5092ef9797f80eed19079651bbbbbaa7e55a5d",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "regression_results": {
+    "total_specs": 3,
+    "total_tests": 16,
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0
+  },
+  "specs_created": [],
+  "specs_updated": [
+    "/app/tests/e2e/projects.spec.ts",
+    "/app/tests/e2e/scores-report.spec.ts"
+  ],
+  "quarantined_tests": [],
+  "test_report_links": [
+    "/app/tests/e2e/core-flows.spec.ts",
+    "/app/tests/e2e/projects.spec.ts",
+    "/app/tests/e2e/scores-report.spec.ts"
+  ],
+  "action_items": [],
+  "updated_files": [
+    "/app/tests/e2e/projects.spec.ts",
+    "/app/tests/e2e/scores-report.spec.ts"
+  ],
+  "success_rate": {
+    "backend": "N/A (mocked APIs)",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "Using demo mode with mock data from /app/lib/mockData.js",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All tests passing. Test coverage includes: demo mode navigation, dashboard stats, theme toggle, projects list/detail, scores page with RAD score/charts/RAPS, AI report generation, PDF download button. APIs are MOCKED via demoApiFetch.",
+  "features_tested": [
+    "Dashboard navigation in demo mode - PASS",
+    "Scores page displays RAD score and pillar breakdown - PASS",
+    "Radar chart displays pillar performance visualization - PASS",
+    "Bar chart displays pillar scores comparison - PASS",
+    "Generate AI Report button works and shows report dialog - PASS",
+    "View Report button displays saved report - PASS",
+    "Download PDF button exists and is clickable - PASS",
+    "Report dialog shows Executive Summary, Pillar Analysis, Action Plan - PASS",
+    "Theme toggle switches between dark and light modes - PASS"
+  ],
+  "notes": "All APIs are MOCKED in demo mode via demoApiFetch in /app/lib/mockData.js. Real backend integration not tested."
+}
