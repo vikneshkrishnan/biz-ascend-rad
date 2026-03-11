@@ -412,11 +412,11 @@ function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">{card.label}</p>
-                  <p className="text-4xl font-bold mt-2 tracking-tight">{card.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{card.desc}</p>
+                  <p className="text-sm font-medium text-white/80 dark:text-muted-foreground">{card.label}</p>
+                  <p className="text-4xl font-bold mt-2 tracking-tight text-white dark:text-foreground">{card.value}</p>
+                  <p className="text-xs text-white/70 dark:text-muted-foreground mt-1">{card.desc}</p>
                 </div>
-                <div className="p-2.5 rounded-xl bg-primary/10"><card.icon className="w-5 h-5 text-primary" /></div>
+                <div className="p-2.5 rounded-xl bg-white/20 dark:bg-primary/10"><card.icon className="w-5 h-5 text-white dark:text-primary" /></div>
               </div>
             </CardContent>
           </Card>
