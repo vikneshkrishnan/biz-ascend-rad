@@ -1761,6 +1761,19 @@ function PublicAssessPage({ token }) {
   const saveTimeout = useRef(null)
 
   useEffect(() => {
+    // Support demo mode tokens
+    if (token.startsWith('demo-token')) {
+      const project = DEMO_PROJECTS.find(p => p.questionnaire_link?.token === token)
+      if (!project) { setError('Invalid or expired link'); setLoading(false); return }
+      if (project.questionnaire_link.status === 'completed') { setSubmitted(true); setLoading(false); return }
+      const assessment = project.latest_assessment
+      setData({ token, status: project.questionnaire_link.status, project_name: project.company_name })
+      setScreenerResponses(assessment?.screener_responses || {})
+      setDiagnosticResponses(assessment?.diagnostic_responses || {})
+      setLoading(false)
+      return
+    }
+    // Real API call
     fetch(`/api/assess/${token}`).then(r => r.json()).then(d => {
       if (d.error) { setError(d.error); setLoading(false); return }
       if (d.completed) { setSubmitted(true); setLoading(false); return }
@@ -1775,7 +1788,15 @@ function PublicAssessPage({ token }) {
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
     saveTimeout.current = setTimeout(async () => {
       setSaving(true)
-      try { await fetch(`/api/assess/${token}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ screener_responses: sResp, diagnostic_responses: dResp, progress: { phase, section: phase === 'screener' ? currentSection : currentPillar } }) }) }
+      try {
+        // Skip API call for demo tokens
+        if (token.startsWith('demo-token')) {
+          // Just simulate save for demo mode
+          await new Promise(r => setTimeout(r, 200))
+        } else {
+          await fetch(`/api/assess/${token}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ screener_responses: sResp, diagnostic_responses: dResp, progress: { phase, section: phase === 'screener' ? currentSection : currentPillar } }) })
+        }
+      }
       catch (e) {} finally { setSaving(false) }
     }, 800)
   }
@@ -1793,6 +1814,14 @@ function PublicAssessPage({ token }) {
   }
 
   async function handleFinalSubmit() {
+    // Demo mode submission
+    if (token.startsWith('demo-token')) {
+      await new Promise(r => setTimeout(r, 1000))
+      toast.success('Assessment submitted successfully!')
+      setSubmitted(true)
+      return
+    }
+    // Real API submission
     await fetch(`/api/assess/${token}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ screener_responses: screenerResponses, diagnostic_responses: diagnosticResponses }) })
     await fetch(`/api/assess/${token}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
     setSubmitted(true)

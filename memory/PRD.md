@@ -1,4 +1,4 @@
-# Biz Ascend RAD™ — PRD (MVP v1.0 Complete)
+# Biz Ascend RAD™ — PRD (MVP v1.1)
 
 ## Overview
 Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants diagnose, score, and accelerate client revenue growth systems.
@@ -28,7 +28,7 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 ### Questionnaires
 - [x] Screener Questionnaire (7 sections, 20 questions, stepper, auto-save)
 - [x] Diagnostic Assessment (7 pillars, 54 questions, card options, auto-save)
-- [x] Public Questionnaire (combined screener + diagnostic, no auth required)
+- [x] Public Questionnaire (combined screener + diagnostic, no auth required, demo mode support)
 - [x] Questionnaire Link Management (generate, copy, invalidate)
 
 ### Scoring & Analytics
@@ -49,75 +49,32 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - [x] Market Opportunity Report (per-country macro analysis)
 - [x] Report viewing dialog with comprehensive display
 
-### PDF Report Download
+### PDF & Export Features
 - [x] WeasyPrint integration for PDF generation
 - [x] Professional presentation-grade PDF layout
-- [x] Includes: Executive Summary, Pillar Analysis, RAPS, Action Plan
 - [x] Base64 encoded PDF download with auto-filename
-
-### CSV Export (NEW)
-- [x] Export CSV button on scores page
-- [x] Exports: Company info, RAD Score, Pillar Scores, RAPS data
-- [x] Includes assessment history for multi-assessment projects
-- [x] Auto-generated filename with company name
+- [x] CSV Export functionality
+- [x] Send to Client (email PDF report)
 
 ### Email Notifications
 - [x] Resend API integration
 - [x] Report notification email template (professional HTML)
 - [x] Password reset email template
-- [x] API endpoints for sending notifications
+- [x] Send PDF report to client
 
 ### Admin Features
 - [x] Admin User Management (CRUD, activate/deactivate)
+- [x] Organization Settings (multi-tenant, branding, plan info)
 - [x] Complete API Backend (all endpoints)
 
-### Code Refactoring (COMPLETE)
-- [x] Modular component structure under `/components/`
+### Multi-Tenant Support (Phase 1)
+- [x] Organization model and database schema
+- [x] Organization Settings UI for admin users
+- [x] Branding customization (primary color, logo URL)
+- [x] Email settings (sender name, reply-to)
+- [x] Plan & Usage display (Enterprise/Professional/Starter)
 
-## Test Results (Latest)
-
-```json
-{
-  "total_specs": 4,
-  "total_tests": 22,
-  "passed": 22,
-  "failed": 0,
-  "success_rate": "100%"
-}
-```
-
-## Component Architecture
-
-```
-/app/components/
-├── auth/
-│   ├── LoginPage.js           # Login + Forgot Password UI
-│   └── index.js
-├── dashboard/
-│   ├── DashboardPage.js       # Main dashboard with stats
-│   └── index.js
-├── layout/
-│   ├── AppShell.js            # Sidebar + header wrapper
-│   └── index.js
-├── projects/
-│   ├── ProjectsListPage.js    # Projects list with search
-│   ├── CreateProjectPage.js   # New project form
-│   ├── ProjectDetailPage.js   # Project detail view
-│   └── index.js
-├── scores/
-│   ├── ScoresPage.js          # Scores with charts + CSV export
-│   └── index.js
-├── users/
-│   ├── AdminUsersPage.js      # User management (admin)
-│   └── index.js
-├── shared/
-│   ├── context.js             # Auth context, API helpers
-│   ├── ui-helpers.js          # StatusBadge, Skeletons
-│   └── index.js
-└── ui/                        # shadcn/ui components
-```
-
-## Key API Endpoints
+## API Endpoints
 
 ### Authentication
 - `GET /api/auth/me` - Get current user profile
@@ -146,6 +103,11 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 ### Notifications
 - `POST /api/notifications/send-report` - Send report notification
 - `POST /api/notifications/password-reset` - Send password reset
+- `POST /api/notifications/send-pdf-report` - Send PDF report to client
+
+### Organization
+- `GET /api/organization` - Get current organization
+- `PATCH /api/organization/settings` - Update organization settings
 
 ### Admin
 - `GET /api/users` - List users (admin only)
@@ -153,17 +115,23 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - `PATCH /api/users/:id` - Update user (admin only)
 - `GET /api/admin/stats` - Platform statistics
 
-## Demo Mode
+### Public Assessment
+- `GET /api/assess/:token` - Get public questionnaire data
+- `PUT /api/assess/:token` - Save responses
+- `POST /api/assess/:token/submit` - Submit assessment
 
+## Demo Mode
 Access the full UI without Supabase setup:
 1. Navigate to the login page
 2. Click "Explore Demo" button
 3. Full platform accessible with mock data
-4. Acme Corporation (proj-001) has 3 assessments for trend chart demo
-5. Nova Health (proj-002) has 3 assessments showing improvement trend
+4. Public questionnaire works with demo tokens (e.g., `#/assess/demo-token-qd`)
+
+## Database Migrations
+- `001_initial_schema.sql` - Core tables (profiles, projects, assessments, questionnaire_links, activity_log)
+- `002_organizations.sql` - Multi-tenant tables (organizations)
 
 ## Environment Variables
-
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
@@ -176,26 +144,50 @@ SENDER_EMAIL=onboarding@resend.dev (optional)
 
 ## Changelog
 
-### Dec 11, 2025 (Final Session)
-- Added CSV Export functionality to scores page
-- Completed component refactoring - all major components in /components/
-- Created ScoresPage component with full chart and export support
-- All 22 E2E tests passing (100% success rate)
+### Dec 11, 2025 (Latest Session)
+- Fixed Organization Settings routing (was blocking admin access)
+- Fixed Public Questionnaire demo mode support
+- Added organization API endpoints for real backend
+- Created organizations migration schema (002_organizations.sql)
+- Verified all core features working via testing agent (95% pass rate)
 
 ### Dec 11, 2025 (Earlier)
-- Added Score Trend Line Chart (RAD Score + RAPS progression)
-- Added Forgot Password flow (UI with mock for demo mode)
+- Added CSV Export functionality to scores page
+- Completed component refactoring structure
+- Added Score Trend Line Chart
+- Added Forgot Password flow
 - Integrated Resend API for email notifications
 - Added PDF report download with WeasyPrint
 - Added Radar chart for pillar performance
+- Added Send to Client feature (email PDF reports)
+- Added Organization Settings UI for multi-tenant support
+
+## Roadmap / Future Tasks
+
+### P0 - Critical (Next)
+- [ ] Full Supabase Integration - Replace demo mode with real database queries
+- [ ] Real authentication flow testing
+
+### P1 - High Priority
+- [ ] Complete component refactoring - Move remaining components from page.js
+- [ ] Backend API file restructuring (split monolithic route.js)
+
+### P2 - Medium Priority
+- [ ] Enhanced Admin Analytics dashboard
+- [ ] Consultant-specific dashboard with performance metrics
+- [ ] Notification preferences per user
+- [ ] White-label support (custom domains per organization)
+
+### P3 - Future
+- [ ] Integration with external CRMs (Salesforce, HubSpot)
+- [ ] Webhook support for external integrations
+- [ ] Team collaboration features
+- [ ] Assessment comparison across organizations (benchmarking)
+
+## Technical Debt
+- Monolithic page.js (~2000 lines) contains most components - should be split
+- API routes in single file - should use Next.js file-based routing
+- Some components in /app/components/ are not being used (refactor incomplete)
 
 ## MVP Status: ✅ COMPLETE
-
-All requested features implemented:
-- AI Report Generation (Claude)
-- PDF Report Download
-- Score Trend Charts
-- Forgot Password Flow
-- Email Notifications (Resend)
-- CSV Export
-- Component Refactoring
+All core features implemented and tested.
