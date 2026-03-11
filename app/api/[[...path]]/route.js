@@ -576,6 +576,41 @@ async function handleRoute(request, { params }) {
       return json({ activities: data || [] })
     }
 
+    // ===== ORGANIZATION ENDPOINTS =====
+    // GET /organization - Get current user's organization
+    if (route === '/organization' && method === 'GET') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      if (user.profile.role !== 'admin') return err('Forbidden', 403)
+      
+      const { data: org, error: e } = await supabaseAdmin.from('organizations')
+        .select('*')
+        .eq('id', user.profile.organization_id)
+        .single()
+      
+      if (e || !org) return err('Organization not found', 404)
+      return json(org)
+    }
+
+    // PATCH /organization/settings - Update organization settings
+    if (route === '/organization/settings' && method === 'PATCH') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      if (user.profile.role !== 'admin') return err('Forbidden', 403)
+      
+      const body = await request.json()
+      const { settings } = body
+      
+      const { data: org, error: e } = await supabaseAdmin.from('organizations')
+        .update({ settings })
+        .eq('id', user.profile.organization_id)
+        .select()
+        .single()
+      
+      if (e) throw e
+      return json(org)
+    }
+
     // ===== REPORT GENERATION =====
     // POST /projects/:id/report/generate
     if (path[0] === 'projects' && path.length === 4 && path[2] === 'report' && path[3] === 'generate' && method === 'POST') {
@@ -682,7 +717,7 @@ async function handleRoute(request, { params }) {
       
       if (!assessment?.scores) return err('No completed assessment found', 400)
 
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://biz-ascend-rad.preview.emergentagent.com'
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://biz-ascend-rad-1.preview.emergentagent.com'
       const reportUrl = `${baseUrl}#/projects/${project_id}/scores`
 
       const emailData = {
@@ -713,7 +748,7 @@ async function handleRoute(request, { params }) {
         return err('email is required', 400)
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://biz-ascend-rad.preview.emergentagent.com'
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://biz-ascend-rad-1.preview.emergentagent.com'
       // In real implementation, this would generate a secure token
       const resetUrl = `${baseUrl}#/reset-password?token=demo-token`
 
@@ -730,6 +765,69 @@ async function handleRoute(request, { params }) {
       } else {
         // Don't reveal if email exists or not for security
         return json({ success: true, message: 'If an account exists with this email, a reset link has been sent' })
+      }
+    }
+
+    // POST /notifications/send-pdf-report - Send PDF report via email
+    if (path[0] === 'notifications' && path[1] === 'send-pdf-report' && method === 'POST') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      
+      const body = await request.json()
+      const { project_id, recipient_email, message } = body
+      
+      if (!project_id || !recipient_email) {
+        return err('project_id and recipient_email are required', 400)
+      }
+
+      const { data: project } = await supabaseAdmin.from('projects').select('*').eq('id', project_id).single()
+      if (!project) return err('Project not found', 404)
+
+      const { data: assessment } = await supabaseAdmin.from('assessments')
+        .select('*')
+        .eq('project_id', project_id)
+        .order('assessment_number', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (!assessment?.scores) return err('No completed assessment found', 400)
+      if (!assessment.report_data) return err('Report not generated yet. Generate AI report first.', 400)
+
+      // Generate PDF
+      const pdfData = {
+        scores: assessment.scores,
+        report_data: assessment.report_data,
+        screener_responses: assessment.screener_responses,
+        generated_at: assessment.report_data.generated_at || new Date().toISOString()
+      }
+
+      let pdfResult
+      try {
+        pdfResult = await runPdfScript(pdfData)
+      } catch (pdfErr) {
+        return err('Failed to generate PDF: ' + pdfErr.message, 500)
+      }
+
+      // Send email with PDF attachment
+      const emailData = {
+        type: 'pdf_report',
+        to_email: recipient_email,
+        company_name: project.company_name,
+        rad_score: assessment.scores.radScore,
+        maturity_band: assessment.scores.maturityBand,
+        consultant_name: user.profile.full_name || user.profile.email,
+        message: message || '',
+        pdf_base64: pdfResult.pdf,
+        filename: pdfResult.filename
+      }
+
+      const result = await sendEmailNotification(emailData)
+      
+      if (result.success) {
+        await logActivity(user.profile.id, project_id, `Sent PDF report to ${recipient_email}`)
+        return json({ success: true, message: `PDF report sent to ${recipient_email}` })
+      } else {
+        return err(result.error || 'Failed to send email', 500)
       }
     }
 

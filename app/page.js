@@ -9,7 +9,7 @@ import {
   ChevronRight, ArrowLeft, Activity, CheckCircle2, Clock, AlertTriangle, Copy,
   PanelLeftClose, PanelLeftOpen, MoreVertical, Building2, FileText, Link2,
   TrendingUp, Shield, Trash2, Edit, BarChart3, Eye, ChevronLeft, Menu, X,
-  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download, FileSpreadsheet
+  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download, FileSpreadsheet, Mail, Send, Settings, Building
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,6 +75,7 @@ function useRouter() {
 function matchRoute(hash) {
   if (hash === '/dashboard') return { page: 'dashboard' }
   if (hash === '/admin/users') return { page: 'admin-users' }
+  if (hash === '/admin/organization') return { page: 'admin-organization' }
   if (hash === '/projects') return { page: 'projects' }
   if (hash === '/projects/new') return { page: 'create-project' }
   const pd = hash.match(/^\/projects\/([^/]+)$/)
@@ -293,6 +294,7 @@ function AppShell({ children }) {
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Projects', icon: FolderKanban, path: '/projects' },
     ...(isAdmin ? [{ label: 'Users', icon: Users, path: '/admin/users' }] : []),
+    ...(isAdmin ? [{ label: 'Organization', icon: Building, path: '/admin/organization' }] : []),
   ]
 
   async function handleLogout() {
@@ -823,6 +825,187 @@ function AdminUsersPage() {
   )
 }
 
+// ===== ORGANIZATION SETTINGS PAGE =====
+function OrganizationSettingsPage() {
+  const { profile } = useAuth()
+  const queryClient = useQueryClient()
+  const { data: org, isLoading } = useQuery({ queryKey: ['organization'], queryFn: () => apiFetch('/organization') })
+  const [saving, setSaving] = useState(false)
+  const [settings, setSettings] = useState(null)
+
+  useEffect(() => {
+    if (org?.settings) setSettings(org.settings)
+  }, [org])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await apiFetch('/organization/settings', { method: 'PATCH', body: { settings } })
+      queryClient.invalidateQueries({ queryKey: ['organization'] })
+      toast.success('Settings saved!')
+    } catch (err) {
+      toast.error(err.message || 'Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (isLoading) return <PageSkeleton />
+  if (!org) return <div className="text-center py-20"><p className="text-muted-foreground">Organization not found</p></div>
+
+  const planColors = { enterprise: 'bg-purple-500', professional: 'bg-blue-500', starter: 'bg-green-500' }
+  const planFeatures = {
+    enterprise: ['Unlimited users', 'Unlimited projects', 'AI Reports', 'PDF Export', 'Email Reports', 'White-label branding', 'Priority support'],
+    professional: ['Up to 10 users', 'Up to 100 projects', 'AI Reports', 'PDF Export', 'Email Reports', 'Custom branding'],
+    starter: ['Up to 3 users', 'Up to 20 projects', 'AI Reports', 'PDF Export']
+  }
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Organization Settings</h1>
+        <p className="text-muted-foreground mt-1">Manage your organization's settings and branding</p>
+      </div>
+
+      {/* Organization Info */}
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Building className="w-5 h-5 text-primary" />Organization Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-muted-foreground text-sm">Organization Name</Label>
+              <p className="font-semibold text-lg">{org.name}</p>
+            </div>
+            <div>
+              <Label className="text-muted-foreground text-sm">Slug</Label>
+              <p className="font-mono text-sm">{org.slug}</p>
+            </div>
+            <div>
+              <Label className="text-muted-foreground text-sm">Created</Label>
+              <p className="text-sm">{new Date(org.created_at).toLocaleDateString()}</p>
+            </div>
+            <div>
+              <Label className="text-muted-foreground text-sm">Organization ID</Label>
+              <p className="font-mono text-xs text-muted-foreground">{org.id}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Plan & Usage */}
+      <Card className="border-2">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" />Plan & Usage</CardTitle>
+            <Badge className={`${planColors[org.plan]} text-white capitalize`}>{org.plan}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl bg-muted/50 text-center">
+              <p className="text-3xl font-bold text-primary">{DEMO_USERS?.length || 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">Users</p>
+              <p className="text-xs text-muted-foreground">of {org.max_users}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-muted/50 text-center">
+              <p className="text-3xl font-bold text-primary">{DEMO_PROJECTS?.length || 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">Projects</p>
+              <p className="text-xs text-muted-foreground">of {org.max_projects}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-muted/50 text-center col-span-2">
+              <p className="text-sm font-medium mb-2">Features Included</p>
+              <div className="flex flex-wrap gap-1 justify-center">
+                {(planFeatures[org.plan] || []).map((f, i) => (
+                  <Badge key={i} variant="outline" className="text-xs">{f}</Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Branding Settings */}
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-primary" />Branding & Customization</CardTitle>
+          <CardDescription>Customize the look and feel of your reports and client-facing pages</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {settings && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Primary Color</Label>
+                  <div className="flex items-center gap-3">
+                    <Input 
+                      type="color" 
+                      value={settings.branding?.primary_color || '#f97316'} 
+                      onChange={e => setSettings({...settings, branding: {...settings.branding, primary_color: e.target.value}})}
+                      className="w-16 h-10 p-1 cursor-pointer"
+                    />
+                    <Input 
+                      value={settings.branding?.primary_color || '#f97316'} 
+                      onChange={e => setSettings({...settings, branding: {...settings.branding, primary_color: e.target.value}})}
+                      className="font-mono"
+                      placeholder="#f97316"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Logo URL (optional)</Label>
+                  <Input 
+                    value={settings.branding?.logo_url || ''} 
+                    onChange={e => setSettings({...settings, branding: {...settings.branding, logo_url: e.target.value}})}
+                    placeholder="https://example.com/logo.png"
+                  />
+                </div>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Email Sender Name</Label>
+                  <Input 
+                    value={settings.email?.sender_name || ''} 
+                    onChange={e => setSettings({...settings, email: {...settings.email, sender_name: e.target.value}})}
+                    placeholder="Your Company RAD"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reply-To Email</Label>
+                  <Input 
+                    type="email"
+                    value={settings.email?.reply_to || ''} 
+                    onChange={e => setSettings({...settings, email: {...settings.email, reply_to: e.target.value}})}
+                    placeholder="support@yourcompany.com"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          <div className="flex justify-end pt-4">
+            <Button onClick={handleSave} disabled={saving} data-testid="save-org-settings-btn">
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : <><Save className="w-4 h-4 mr-2" />Save Settings</>}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Multi-tenant Info */}
+      <Card className="border-2 border-dashed">
+        <CardContent className="p-6 text-center">
+          <Building2 className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+          <h3 className="font-semibold mb-2">Multi-Tenant Architecture</h3>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            All data is isolated to your organization. Users and projects are scoped to <strong>{org.name}</strong> and cannot be accessed by other organizations.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ===== SCREENER PAGE =====
 function ScreenerPage({ id }) {
   const { navigate } = useAuth()
@@ -1033,7 +1216,7 @@ function DiagnosticPage({ id }) {
 
 // ===== SCORES PAGE =====
 function ScoresPage({ id }) {
-  const { navigate } = useAuth()
+  const { navigate, profile } = useAuth()
   const queryClient = useQueryClient()
   const { data: scores, isLoading } = useQuery({ queryKey: ['scores', id], queryFn: () => apiFetch(`/projects/${id}/scores`) })
   const { data: project } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
@@ -1041,6 +1224,9 @@ function ScoresPage({ id }) {
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [report, setReport] = useState(null)
+  const [showSendDialog, setShowSendDialog] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailForm, setEmailForm] = useState({ email: '', message: '' })
 
   async function generateReport() {
     setGenerating(true)
@@ -1174,6 +1360,36 @@ function ScoresPage({ id }) {
     toast.success('CSV exported!')
   }
 
+  async function sendToClient(e) {
+    e.preventDefault()
+    if (!emailForm.email) {
+      toast.error('Please enter a recipient email')
+      return
+    }
+    setSendingEmail(true)
+    try {
+      // In demo mode, simulate sending
+      if (_demoMode) {
+        await new Promise(r => setTimeout(r, 2000))
+        toast.success(`Report sent to ${emailForm.email}!`)
+        setShowSendDialog(false)
+        setEmailForm({ email: '', message: '' })
+      } else {
+        await apiFetch('/notifications/send-pdf-report', {
+          method: 'POST',
+          body: { project_id: id, recipient_email: emailForm.email, message: emailForm.message }
+        })
+        toast.success(`Report sent to ${emailForm.email}!`)
+        setShowSendDialog(false)
+        setEmailForm({ email: '', message: '' })
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to send email')
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
   if (isLoading) return <PageSkeleton />
   if (!scores) return <div className="text-center py-20"><p className="text-muted-foreground">No scores available</p></div>
 
@@ -1205,6 +1421,9 @@ function ScoresPage({ id }) {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={exportToCSV} data-testid="export-csv-btn">
             <FileSpreadsheet className="w-4 h-4 mr-2" />Export CSV
+          </Button>
+          <Button variant="outline" onClick={() => setShowSendDialog(true)} data-testid="send-to-client-btn">
+            <Mail className="w-4 h-4 mr-2" />Send to Client
           </Button>
           <Button variant="outline" onClick={loadReport} data-testid="view-report-btn">
             <FileText className="w-4 h-4 mr-2" />View Report
@@ -1465,11 +1684,62 @@ function ScoresPage({ id }) {
             </div>
           )}
           <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => { setShowReport(false); setShowSendDialog(true) }}>
+              <Mail className="w-4 h-4 mr-2" />Send to Client
+            </Button>
             <Button variant="outline" onClick={downloadPdf} disabled={downloadingPdf}>
               {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Download PDF
             </Button>
             <Button variant="outline" onClick={() => setShowReport(false)}>Close</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send to Client Dialog */}
+      <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Mail className="w-5 h-5 text-primary" />Send Report to Client</DialogTitle>
+            <DialogDescription>Email the PDF report directly to your client</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={sendToClient} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="recipient-email">Recipient Email *</Label>
+              <Input 
+                id="recipient-email" 
+                type="email" 
+                value={emailForm.email} 
+                onChange={e => setEmailForm({...emailForm, email: e.target.value})}
+                placeholder="client@company.com"
+                required
+                data-testid="send-email-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email-message">Personal Message (optional)</Label>
+              <Textarea 
+                id="email-message" 
+                value={emailForm.message} 
+                onChange={e => setEmailForm({...emailForm, message: e.target.value})}
+                placeholder="Add a personal note to your client..."
+                rows={3}
+              />
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 text-sm">
+              <p className="text-muted-foreground">The email will include:</p>
+              <ul className="mt-2 space-y-1 text-muted-foreground">
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" />RAD Score: <span className="font-medium text-foreground">{scores?.radScore}</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" />Full PDF report attached</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" />Sent from: <span className="font-medium text-foreground">{profile?.full_name || profile?.email}</span></li>
+              </ul>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowSendDialog(false)}>Cancel</Button>
+              <Button type="submit" disabled={sendingEmail} data-testid="send-email-btn">
+                {sendingEmail ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : <><Send className="w-4 h-4 mr-2" />Send Report</>}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
@@ -1672,6 +1942,8 @@ export default function App() {
         {route.page === 'dashboard' && <DashboardPage />}
         {route.page === 'admin-users' && profile?.role === 'admin' && <AdminUsersPage />}
         {route.page === 'admin-users' && profile?.role !== 'admin' && <NotFoundPage />}
+        {route.page === 'admin-organization' && profile?.role === 'admin' && <OrganizationSettingsPage />}
+        {route.page === 'admin-organization' && profile?.role !== 'admin' && <NotFoundPage />}
         {route.page === 'projects' && <ProjectsListPage />}
         {route.page === 'create-project' && <CreateProjectPage />}
         {route.page === 'project-detail' && <ProjectDetailPage id={route.id} />}

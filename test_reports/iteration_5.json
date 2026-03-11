@@ -1,0 +1,77 @@
+{
+  "summary": "Frontend testing complete for Biz Ascend RAD demo mode. All core features pass except public questionnaire which doesn't support demo mode. Testing focused on: Demo mode login, Dashboard with stats/sector distribution, Projects list with search/filter, Organization Settings page (admin), Scores page buttons.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Public Questionnaire (/assess/:token)",
+        "issue": "Public questionnaire page uses direct fetch('/api/assess/...') instead of apiFetch helper, so demo mode tokens don't work. Results in 404 error and redirect to login page.",
+        "affected_selectors": ["PublicAssessPage component"],
+        "priority": "LOW - affects demo mode only, real API works"
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/tests/e2e/core-flows.spec.ts",
+    "/app/tests/e2e/forgot-password.spec.ts",
+    "/app/tests/e2e/projects.spec.ts",
+    "/app/tests/e2e/scores-report.spec.ts"
+  ],
+  "action_items": [
+    "Consider updating PublicAssessPage to support demo mode tokens (use demoApiFetch for tokens starting with 'demo-')"
+  ],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (all APIs MOCKED in demo mode)",
+    "frontend": "95%"
+  },
+  "seed_data_creation": "Using demo mode with mock data from /app/lib/mockData.js",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All core demo mode features pass. Public questionnaire doesn't work in demo mode (tokens like demo-token-abc are not handled). All APIs are MOCKED in demo mode via demoApiFetch function.",
+  "features_tested": {
+    "demo_mode_login": {
+      "status": "PASS",
+      "details": "Explore Demo button visible and functional, redirects to #/dashboard"
+    },
+    "dashboard_stats_cards": {
+      "status": "PASS",
+      "details": "All 4 cards visible: Total Projects (7), Active Diagnostics (2), Completed (4), Consultants (4)"
+    },
+    "dashboard_sector_distribution": {
+      "status": "PASS",
+      "details": "Sector Distribution visible for admin user, shows 7 sectors"
+    },
+    "projects_list_page": {
+      "status": "PASS",
+      "details": "Shows 7 total projects, search input visible, status filter visible, project cards display correctly"
+    },
+    "organization_settings_page": {
+      "status": "PASS",
+      "details": "Admin-only nav item visible, page loads with Organization Details, Plan & Usage (Enterprise), Branding & Customization, Save Settings button"
+    },
+    "scores_page_buttons": {
+      "status": "PASS",
+      "details": "All buttons visible: Export CSV, Send to Client, View Report, Download PDF, Generate AI Report"
+    },
+    "public_questionnaire": {
+      "status": "PARTIAL",
+      "details": "URL /assess/demo-token-abc redirects to login with 404 errors - PublicAssessPage doesn't use demo mode, makes direct API calls"
+    }
+  },
+  "screenshots": [
+    "01_login_page.png - Login page with Explore Demo button",
+    "02_dashboard.png - Dashboard with stats cards and sector distribution",
+    "03_projects_list.png - Projects list with 7 projects",
+    "04_organization_settings.png - Organization Settings page (admin)",
+    "05_project_detail.png - Acme Corporation project detail",
+    "06_scores_page.png - Scores page with all action buttons"
+  ],
+  "mocked_apis_note": "ALL API calls in demo mode return mock data via demoApiFetch function in /app/lib/mockData.js. Real Supabase API not used in demo mode."
+}

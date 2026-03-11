@@ -169,7 +169,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 EMERGENT_LLM_KEY=sk-emergent-xxx
-NEXT_PUBLIC_BASE_URL=https://biz-ascend-rad.preview.emergentagent.com
+NEXT_PUBLIC_BASE_URL=https://biz-ascend-rad-1.preview.emergentagent.com
 RESEND_API_KEY=re_... (optional - for email notifications)
 SENDER_EMAIL=onboarding@resend.dev (optional)
 ```
