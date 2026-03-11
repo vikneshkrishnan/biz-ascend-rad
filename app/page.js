@@ -8,7 +8,7 @@ import {
   LayoutDashboard, FolderKanban, Users, LogOut, Sun, Moon, Zap, Plus, Search,
   ChevronRight, ArrowLeft, Activity, CheckCircle2, Clock, AlertTriangle, Copy,
   PanelLeftClose, PanelLeftOpen, MoreVertical, Building2, FileText, Link2,
-  TrendingUp, Shield, Trash2, Edit, BarChart3, Eye, ChevronLeft, Menu, X,
+  TrendingUp, Shield, Trash2, Edit, BarChart3, Eye, EyeOff, ChevronLeft, Menu, X,
   Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download, FileSpreadsheet, Mail, Send, Settings, Building
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -74,6 +74,7 @@ function useRouter() {
 
 function matchRoute(hash) {
   if (hash === '/dashboard') return { page: 'dashboard' }
+  if (hash === '/signup') return { page: 'signup' }
   if (hash === '/admin/users') return { page: 'admin-users' }
   if (hash === '/admin/organization') return { page: 'admin-organization' }
   if (hash === '/projects') return { page: 'projects' }
@@ -130,6 +131,7 @@ function LoginPage({ onSuccess, onDemo }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -181,7 +183,12 @@ function LoginPage({ onSuccess, onDemo }) {
                     Forgot password?
                   </button>
                 </div>
-                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required className="h-11 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="login-password-input" />
+                <div className="relative">
+                  <Input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required className="h-11 pr-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="login-password-input" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" data-testid="login-toggle-password">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" className="w-full h-11 text-base font-semibold bg-primary hover:bg-primary/90 text-white" disabled={loading} data-testid="login-submit-btn">
                 {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Signing in...</> : 'Sign In'}
@@ -192,7 +199,9 @@ function LoginPage({ onSuccess, onDemo }) {
         <Button type="button" variant="outline" className="w-full h-11 border-white/30 text-white bg-transparent hover:bg-transparent hover:border-white/60" onClick={onDemo} data-testid="explore-demo-btn">
           <Eye className="w-4 h-4 mr-2" />Explore Demo
         </Button>
-        <p className="text-center text-xs text-white/50">Contact your administrator for account access</p>
+        <p className="text-center text-sm text-white/70">Don&apos;t have an account?{' '}
+          <a href="#/signup" className="text-primary hover:underline font-medium" data-testid="signup-link">Create account</a>
+        </p>
       </div>
     </div>
   )
@@ -294,6 +303,107 @@ function ForgotPasswordPage({ onBack }) {
             </Button>
           </CardContent>
         </Card>
+      </div>
+    </div>
+  )
+}
+
+// ===== SIGNUP PAGE =====
+function SignupPage({ onSuccess, onDemo }) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  async function handleSignup(e) {
+    e.preventDefault()
+    setError('')
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+    setLoading(true)
+    try {
+      const { error: authErr } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name, role: 'consultant' } }
+      })
+      if (authErr) throw authErr
+      toast.success('Account created! Check your email to verify your account.', { description: 'A verification link has been sent to your inbox.', duration: 6000 })
+      onSuccess()
+    } catch (err) { setError(err.message || 'Signup failed') } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[hsl(222,47%,5%)]">
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        src="/Image_to_video_delpmaspu_.mp4"
+      />
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="w-full max-w-md space-y-8 relative z-10">
+        <div className="text-center space-y-2">
+          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
+            <Zap className="w-8 h-8 text-primary-foreground" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Create Account</h1>
+          <p className="text-white/70">Join Biz Ascend RAD&trade; Platform</p>
+        </div>
+        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 backdrop-blur-md login-card">
+          <CardContent className="pt-6">
+            <form onSubmit={handleSignup} className="space-y-4">
+              {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">{error}</div>}
+              <div className="space-y-2">
+                <Label htmlFor="signup-name" className="text-gray-700 font-medium">Full Name</Label>
+                <Input id="signup-name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="John Doe" required className="h-11 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="signup-name-input" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="signup-email" className="text-gray-700 font-medium">Email</Label>
+                <Input id="signup-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required className="h-11 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="signup-email-input" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="signup-password" className="text-gray-700 font-medium">Password</Label>
+                <div className="relative">
+                  <Input id="signup-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 characters" required className="h-11 pr-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="signup-password-input" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" data-testid="signup-toggle-password">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="signup-confirm" className="text-gray-700 font-medium">Confirm Password</Label>
+                <div className="relative">
+                  <Input id="signup-confirm" type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required className="h-11 pr-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="signup-confirm-input" />
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" data-testid="signup-toggle-confirm">
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <Button type="submit" className="w-full h-11 text-base font-semibold bg-primary hover:bg-primary/90 text-white" disabled={loading} data-testid="signup-submit-btn">
+                {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating account...</> : 'Create Account'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+        <Button type="button" variant="outline" className="w-full h-11 border-white/30 text-white bg-transparent hover:bg-transparent hover:border-white/60" onClick={onDemo} data-testid="explore-demo-btn">
+          <Eye className="w-4 h-4 mr-2" />Explore Demo
+        </Button>
+        <p className="text-center text-sm text-white/70">Already have an account?{' '}
+          <a href="#/login" className="text-primary hover:underline font-medium" data-testid="login-link">Sign In</a>
+        </p>
       </div>
     </div>
   )
@@ -670,7 +780,7 @@ function ProjectDetailPage({ id }) {
         </div>
         <div className="flex gap-2">
           {diagnosticStatus === 'completed' && <Button variant="outline" onClick={startReassessment}><RefreshCw className="w-4 h-4 mr-2" />Reassess</Button>}
-          <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setShowArchive(true)}><Trash2 className="w-4 h-4" /></Button>
+          {profile?.role === 'admin' && <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setShowArchive(true)}><Trash2 className="w-4 h-4" /></Button>}
         </div>
       </div>
       {/* Status Cards */}
@@ -777,6 +887,7 @@ function AdminUsersPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'consultant' })
   const [creating, setCreating] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -831,7 +942,7 @@ function AdminUsersPage() {
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="space-y-2"><Label>Name</Label><Input value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} required /></div>
           <div className="space-y-2"><Label>Email</Label><Input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} required /></div>
-          <div className="space-y-2"><Label>Password</Label><Input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required /></div>
+          <div className="space-y-2"><Label>Password</Label><div className="relative"><Input type={showPassword ? 'text' : 'password'} value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required className="pr-10" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" data-testid="admin-toggle-password">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div></div>
           <div className="space-y-2"><Label>Role</Label>
             <Select value={newUser.role} onValueChange={v => setNewUser({ ...newUser, role: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="consultant">Consultant</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select>
           </div>
@@ -1978,6 +2089,7 @@ export default function App() {
   if (assessMatch) return <PublicAssessPage token={assessMatch[1]} />
 
   if (loading && !demoActive) return <LoadingScreen />
+  if (hash === '/signup' && !user && !demoActive) return <SignupPage onSuccess={checkAuth} onDemo={enterDemoMode} />
   if ((hash === '/login' || !user) && !demoActive) return <LoginPage onSuccess={checkAuth} onDemo={enterDemoMode} />
 
   const route = matchRoute(hash)

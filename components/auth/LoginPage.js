@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/components/shared/context'
 import { toast } from 'sonner'
-import { Zap, Mail, ArrowLeft, Loader2 } from 'lucide-react'
+import { Zap, Mail, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ export function LoginPage({ onSuccess, onDemo }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -67,7 +68,12 @@ export function LoginPage({ onSuccess, onDemo }) {
                   Forgot password?
                 </button>
               </div>
-              <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" data-testid="login-password-input" />
+              <div className="relative">
+                <Input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="pr-10" data-testid="login-password-input" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" data-testid="login-toggle-password">
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={loading} data-testid="login-submit-btn">
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Signing in...</> : 'Sign In'}

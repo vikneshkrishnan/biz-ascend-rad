@@ -329,6 +329,7 @@ async function handleRoute(request, { params }) {
     if (path[0] === 'projects' && path.length === 2 && method === 'DELETE') {
       const user = await getUser(request)
       if (!user) return err('Unauthorized', 401)
+      if (user.profile.role !== 'admin') return err('Forbidden', 403)
       const projectId = path[1]
       const { error: e } = await supabaseAdmin.from('projects').delete().eq('id', projectId)
       if (e) throw e
