@@ -1,0 +1,59 @@
+{
+  "summary": "Update mode testing - Score Trend Line Chart feature testing complete. Updated 2 existing tests in scores-report.spec.ts to reflect new feature. All 21 E2E tests pass.",
+  "mode": "update",
+  "baseline_commit": "a174528303a213bef0730795e126806ee941a36c",
+  "head_commit": "04830785da351cc8ba44d548143ef1c82a890c14",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "regression_results": {
+    "total_specs": 4,
+    "total_tests": 21,
+    "passed": 21,
+    "failed": 0,
+    "skipped": 0
+  },
+  "specs_created": [],
+  "specs_updated": [
+    "/app/tests/e2e/scores-report.spec.ts"
+  ],
+  "quarantined_tests": [],
+  "test_report_links": [
+    "/app/tests/e2e/core-flows.spec.ts",
+    "/app/tests/e2e/forgot-password.spec.ts",
+    "/app/tests/e2e/projects.spec.ts",
+    "/app/tests/e2e/scores-report.spec.ts"
+  ],
+  "action_items": [],
+  "updated_files": [
+    "/app/tests/e2e/scores-report.spec.ts"
+  ],
+  "success_rate": {
+    "backend": "N/A (mocked APIs)",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "Using demo mode with mock data from /app/lib/mockData.js",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 21 tests passing. Score Trend Line Chart feature verified working: Projects with multiple assessments (Acme Corporation, Nova Health Systems) display Score Trend chart with RAD Score and RAPS % lines. Projects with single assessment (CyberShield Security) display Pillar Scores bar chart instead. All APIs are MOCKED in demo mode.",
+  "features_tested": [
+    "Score Trend line chart appears for projects with multiple assessments (proj-001, proj-002) - PASS",
+    "Acme Corporation (proj-001) shows 3 assessment data points on trend chart - PASS",
+    "Trend chart displays both RAD Score (orange line) and RAPS % (green line) - PASS",
+    "Projects with single assessment show Pillar Scores bar chart instead - PASS",
+    "Demo mode navigation still works - PASS",
+    "Dashboard stats display correctly - PASS",
+    "Theme toggle still functional - PASS",
+    "Projects list and navigation working - PASS",
+    "Forgot password flow still functional - PASS",
+    "AI report generation button working - PASS",
+    "PDF download button working - PASS"
+  ],
+  "notes": "Updated scores-report.spec.ts: Changed test 'Scores page shows RAD score, pillar breakdown, and RAPS' to verify 'Score Trend' instead of 'Pillar Scores'. Changed test 'Bar chart displays pillar scores comparison' to 'Score Trend line chart displays RAD Score and RAPS progression for projects with multiple assessments'. All APIs are MOCKED in demo mode via demoApiFetch."
+}

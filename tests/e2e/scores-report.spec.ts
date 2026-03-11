@@ -29,8 +29,8 @@ test.describe('Scores Page and AI Report Generation', () => {
     // Verify Pillar Performance chart section (radar chart)
     await expect(page.getByText('Pillar Performance')).toBeVisible();
     
-    // Verify Pillar Scores chart section (bar chart)
-    await expect(page.getByText('Pillar Scores')).toBeVisible();
+    // Acme Corporation has 3 assessments, so Score Trend chart should appear instead of Pillar Scores
+    await expect(page.getByText('Score Trend')).toBeVisible();
     
     // Verify RAPS section
     await expect(page.getByText(/Revenue Achievement Probability Score/i)).toBeVisible();
@@ -133,26 +133,29 @@ test.describe('Scores Page and AI Report Generation', () => {
     await expect(page.locator('.recharts-radar')).toBeVisible();
   });
 
-  test('Bar chart displays pillar scores comparison', async ({ page }) => {
+  test('Score Trend line chart displays RAD Score and RAPS progression for projects with multiple assessments', async ({ page }) => {
     await enterDemoMode(page);
     
-    // Navigate to scores page
+    // Navigate to scores page for Acme Corporation (proj-001 has 3 assessments)
     await page.goto('/#/projects/proj-001/scores');
     await page.waitForLoadState('domcontentloaded');
     
     // Wait for page to load
     await expect(page.getByText('RAD Growth System Score')).toBeVisible({ timeout: 10000 });
     
-    // Verify Pillar Scores section exists (bar chart)
-    await expect(page.getByText('Pillar Scores')).toBeVisible();
+    // Verify Score Trend section exists (line chart appears when multiple assessments exist)
+    await expect(page.getByText('Score Trend')).toBeVisible();
     
-    // Verify bar chart renders - look for recharts bar elements
-    // The bar chart should show horizontal bars for pillar scores
-    const barChartContainer = page.locator('.recharts-wrapper').nth(1);
-    await expect(barChartContainer).toBeVisible();
+    // Verify line chart renders - look for recharts line elements
+    const lineChartContainer = page.locator('.recharts-wrapper').nth(1);
+    await expect(lineChartContainer).toBeVisible();
     
-    // Verify bar chart has bars rendered
-    await expect(page.locator('.recharts-bar-rectangle').first()).toBeVisible();
+    // Verify line chart has lines rendered (two lines: RAD Score and RAPS %)
+    await expect(page.locator('.recharts-line').first()).toBeVisible();
+    
+    // Verify legend shows both RAD Score and RAPS %
+    await expect(page.getByText('RAD Score').first()).toBeVisible();
+    await expect(page.getByText('RAPS %').first()).toBeVisible();
   });
 
   test('Download PDF button exists and is clickable', async ({ page }) => {
