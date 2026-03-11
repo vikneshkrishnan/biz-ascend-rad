@@ -10,12 +10,14 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - **Database**: Supabase (PostgreSQL via REST API)
 - **AI Integration**: Claude Sonnet 4 via Emergent LLM Key
 - **PDF Generation**: WeasyPrint (Python)
+- **Email Service**: Resend API
 - **Theme**: Dark mode (black + orange) / Light mode (colorful cards)
 
 ## Completed Features
 
 ### Core UI & Navigation
 - [x] Authentication (Login + Session + Role-based: admin/consultant)
+- [x] **Forgot Password Flow** (UI with mock flow for demo mode)
 - [x] Demo Mode (explore full UI with mock data without Supabase)
 - [x] Dashboard (overview cards, recent activity, sector distribution)
 - [x] Project Management (list, create, detail, archive)
@@ -32,8 +34,8 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 ### Scoring & Analytics
 - [x] Scoring Engine (RAD Score, maturity bands, pillar scores, primary constraint, RAPS)
 - [x] Scores Visualization (heatmap, traffic lights, RAPS breakdown)
-- [x] **Radar Chart** - Pillar performance visualization (Recharts)
-- [x] **Bar Chart** - Horizontal pillar scores comparison (Recharts)
+- [x] Radar Chart - Pillar performance visualization (Recharts)
+- [x] Bar Chart - Horizontal pillar scores comparison (Recharts)
 - [x] Reassessment Support (start new assessment, history table)
 
 ### AI Report Generation
@@ -50,7 +52,7 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - [x] Market Opportunity Report (per-country macro analysis)
 - [x] Report viewing dialog with comprehensive display
 
-### PDF Report Download (NEW - Dec 2025)
+### PDF Report Download
 - [x] WeasyPrint integration for PDF generation (`/app/scripts/generate_pdf.py`)
 - [x] API endpoint: GET `/api/projects/:id/report/pdf`
 - [x] Professional presentation-grade PDF layout
@@ -58,24 +60,36 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - [x] Base64 encoded PDF download with auto-filename
 - [x] "Download PDF" button in UI
 
+### Email Notifications (NEW - Dec 2025)
+- [x] Resend API integration (`/app/scripts/email_service.py`)
+- [x] Report notification email template (professional HTML)
+- [x] Password reset email template
+- [x] API endpoint: POST `/api/notifications/send-report`
+- [x] API endpoint: POST `/api/notifications/password-reset`
+
 ### Admin Features
 - [x] Admin User Management (CRUD, activate/deactivate)
 - [x] Complete API Backend (all endpoints for Supabase integration)
 
+### Code Refactoring (Partial - P3)
+- [x] Created component structure under `/components/`
+  - `/components/auth/` - LoginPage, ForgotPasswordPage
+  - `/components/dashboard/` - DashboardPage
+  - `/components/layout/` - AppShell
+  - `/components/projects/` - ProjectsListPage, CreateProjectPage
+  - `/components/shared/` - Context, UI helpers
+- [ ] Full migration of page.js to use new components (deferred - working as-is)
+
 ## Pending Features (Phase 2+)
 
-### High Priority (P1)
-- [ ] Score Trend Line Chart (show RAD score progression across reassessments)
-- [ ] Supabase live integration (currently demo mode only)
-
 ### Medium Priority (P2)
-- [ ] Forgot Password flow
-- [ ] Email notifications for report completion
-- [ ] Export data to CSV
+- [ ] Full Supabase live integration (currently demo mode only)
+- [ ] Score Trend Line Chart (RAD score progression across reassessments)
 
 ### Low Priority (P3)
-- [ ] Code Refactoring (break down monolithic page.js)
-- [ ] API route restructuring (file-based routing)
+- [ ] Complete code refactoring (finish migrating remaining components)
+- [ ] API route restructuring to file-based routing
+- [ ] CSV export functionality
 
 ## Architecture
 
@@ -90,6 +104,11 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 │   ├── providers.js          # Theme provider
 │   └── globals.css           # Global styles
 ├── components/
+│   ├── auth/                 # Login, ForgotPassword
+│   ├── dashboard/            # Dashboard page
+│   ├── layout/               # AppShell
+│   ├── projects/             # Projects pages
+│   ├── shared/               # Context, helpers
 │   └── ui/                   # shadcn/ui components
 ├── lib/
 │   ├── constants.js          # App constants, pillar definitions
@@ -98,14 +117,16 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 │   └── utils.js              # Utility functions
 ├── scripts/
 │   ├── generate_report.py    # Claude AI report generation
-│   └── generate_pdf.py       # WeasyPrint PDF generation
+│   ├── generate_pdf.py       # WeasyPrint PDF generation
+│   └── email_service.py      # Resend email notifications
 ├── tests/
 │   └── e2e/                  # Playwright tests
 │       ├── core-flows.spec.ts
+│       ├── forgot-password.spec.ts
 │       ├── projects.spec.ts
 │       └── scores-report.spec.ts
 ├── test_reports/
-│   └── iteration_1.json      # Latest test results
+│   └── iteration_2.json      # Latest test results
 └── migrations/
     └── 001_initial_schema.sql
 ```
@@ -136,6 +157,10 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - `GET /api/projects/:id/report` - Get generated report
 - `GET /api/projects/:id/report/pdf` - Download PDF report
 
+### Notifications
+- `POST /api/notifications/send-report` - Send report notification email
+- `POST /api/notifications/password-reset` - Send password reset email
+
 ### Public Assessment
 - `GET /api/assess/:token` - Get public questionnaire data
 - `PUT /api/assess/:token` - Save responses
@@ -151,8 +176,9 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 
 ```json
 {
-  "total_tests": 16,
-  "passed": 16,
+  "total_specs": 4,
+  "total_tests": 21,
+  "passed": 21,
   "failed": 0,
   "success_rate": "100%"
 }
@@ -166,12 +192,31 @@ Access the full UI without Supabase setup:
 3. Full platform is accessible with mock data
 4. Navigate to Projects → Select project → View Scores
 5. Use "Generate AI Report", "View Report", "Download PDF" buttons
+6. Click "Forgot password?" to test password reset flow (mock)
 
 ## Changelog
 
 ### Dec 11, 2025
+- Added Forgot Password flow (UI with mock for demo mode)
+- Integrated Resend API for email notifications
+- Created component structure under /components/
+- Added email notification API endpoints
+- All 21 E2E tests passing
+
+### Dec 11, 2025 (Earlier)
 - Added PDF report download with WeasyPrint
 - Added Radar chart for pillar performance visualization
 - Added Bar chart for pillar scores comparison
 - Fixed mobile responsiveness (tablet view verified)
-- All 16 E2E tests passing
+
+## Environment Variables
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+EMERGENT_LLM_KEY=sk-emergent-xxx
+NEXT_PUBLIC_BASE_URL=https://biz-ascend-rad.preview.emergentagent.com
+RESEND_API_KEY=re_... (optional - for email notifications)
+SENDER_EMAIL=onboarding@resend.dev (optional)
+```
