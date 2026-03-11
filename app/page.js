@@ -128,6 +128,7 @@ function LoginPage({ onSuccess, onDemo }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -139,6 +140,10 @@ function LoginPage({ onSuccess, onDemo }) {
       toast.success('Welcome back!')
       onSuccess()
     } catch (err) { setError(err.message || 'Invalid credentials') } finally { setLoading(false) }
+  }
+
+  if (showForgotPassword) {
+    return <ForgotPasswordPage onBack={() => setShowForgotPassword(false)} />
   }
 
   return (
@@ -157,23 +162,120 @@ function LoginPage({ onSuccess, onDemo }) {
               {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg border border-destructive/20">{error}</div>}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required className="h-11" />
+                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required className="h-11" data-testid="login-email-input" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required className="h-11" />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <button type="button" onClick={() => setShowForgotPassword(true)} className="text-xs text-primary hover:underline" data-testid="forgot-password-link">
+                    Forgot password?
+                  </button>
+                </div>
+                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required className="h-11" data-testid="login-password-input" />
               </div>
-              <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={loading}>
+              <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={loading} data-testid="login-submit-btn">
                 {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Signing in...</> : 'Sign In'}
               </Button>
               <div className="relative"><div className="absolute inset-0 flex items-center"><Separator /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div></div>
-              <Button type="button" variant="outline" className="w-full h-11" onClick={onDemo}>
+              <Button type="button" variant="outline" className="w-full h-11" onClick={onDemo} data-testid="explore-demo-btn">
                 <Eye className="w-4 h-4 mr-2" />Explore Demo
               </Button>
             </form>
           </CardContent>
         </Card>
         <p className="text-center text-xs text-muted-foreground">Contact your administrator for account access</p>
+      </div>
+    </div>
+  )
+}
+
+// ===== FORGOT PASSWORD PAGE =====
+function ForgotPasswordPage({ onBack }) {
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!email) {
+      toast.error('Please enter your email')
+      return
+    }
+    setLoading(true)
+    try {
+      // In demo mode, just simulate the flow
+      if (_demoMode) {
+        await new Promise(r => setTimeout(r, 1500))
+        setSent(true)
+        toast.success('Reset link sent! Check your email.')
+      } else {
+        // Real Supabase password reset
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        })
+        if (error) throw error
+        setSent(true)
+        toast.success('Reset link sent! Check your email.')
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to send reset link')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
+          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
+            <Zap className="w-8 h-8 text-primary-foreground" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Reset Password</h1>
+          <p className="text-muted-foreground">
+            {sent ? "Check your inbox for the reset link" : "Enter your email to receive a reset link"}
+          </p>
+        </div>
+        <Card className="border-2">
+          <CardContent className="pt-6 space-y-6">
+            {sent ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                  <CheckCircle2 className="w-8 h-8 mx-auto text-green-500 mb-2" />
+                  <p className="text-green-600 dark:text-green-400 font-medium">Reset link sent!</p>
+                  <p className="text-sm text-muted-foreground mt-1">We've sent a password reset link to <strong>{email}</strong></p>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Didn't receive the email? Check your spam folder or try again.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => setSent(false)}>
+                  Try another email
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email Address</Label>
+                  <Input 
+                    id="reset-email" 
+                    type="email" 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)} 
+                    placeholder="you@company.com" 
+                    className="h-11"
+                    data-testid="forgot-email-input"
+                  />
+                </div>
+                <Button type="submit" className="w-full h-11" disabled={loading} data-testid="forgot-submit-btn">
+                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : 'Send Reset Link'}
+                </Button>
+              </form>
+            )}
+            <Button variant="ghost" className="w-full" onClick={onBack} data-testid="back-to-login-btn">
+              <ArrowLeft className="w-4 h-4 mr-2" />Back to Login
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

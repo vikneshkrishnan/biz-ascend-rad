@@ -60,6 +60,33 @@ async function runPdfScript(data) {
   }
 }
 
+// Helper function to send email notifications
+async function sendEmailNotification(data) {
+  const scriptPath = '/app/scripts/email_service.py'
+  const inputJson = JSON.stringify(data)
+  
+  try {
+    const { stdout, stderr } = await execPromise(
+      `echo '${inputJson.replace(/'/g, "'\\''")}' | python3 ${scriptPath}`,
+      { 
+        maxBuffer: 1024 * 1024, // 1MB buffer
+        timeout: 30000, // 30 second timeout
+        env: { ...process.env }
+      }
+    )
+    
+    if (stderr) {
+      console.error('Email stderr:', stderr)
+    }
+    
+    const result = JSON.parse(stdout.trim())
+    return result
+  } catch (error) {
+    console.error('Email script error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -628,6 +655,81 @@ async function handleRoute(request, { params }) {
       } catch (pdfErr) {
         console.error('PDF generation error:', pdfErr)
         return err('PDF generation failed: ' + pdfErr.message, 500)
+      }
+    }
+
+    // POST /notifications/send-report - Send report notification email
+    if (path[0] === 'notifications' && path[1] === 'send-report' && method === 'POST') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      
+      const body = await request.json()
+      const { project_id, recipient_email } = body
+      
+      if (!project_id || !recipient_email) {
+        return err('project_id and recipient_email are required', 400)
+      }
+
+      const { data: project } = await supabaseAdmin.from('projects').select('*').eq('id', project_id).single()
+      if (!project) return err('Project not found', 404)
+
+      const { data: assessment } = await supabaseAdmin.from('assessments')
+        .select('*')
+        .eq('project_id', project_id)
+        .order('assessment_number', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (!assessment?.scores) return err('No completed assessment found', 400)
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://biz-ascend-rad.preview.emergentagent.com'
+      const reportUrl = `${baseUrl}#/projects/${project_id}/scores`
+
+      const emailData = {
+        type: 'report_notification',
+        to_email: recipient_email,
+        company_name: project.company_name,
+        rad_score: assessment.scores.radScore,
+        maturity_band: assessment.scores.maturityBand,
+        report_url: reportUrl
+      }
+
+      const result = await sendEmailNotification(emailData)
+      
+      if (result.success) {
+        await logActivity(user.profile.id, project_id, `Sent report notification to ${recipient_email}`)
+        return json({ success: true, message: `Report notification sent to ${recipient_email}` })
+      } else {
+        return err(result.error || 'Failed to send email', 500)
+      }
+    }
+
+    // POST /notifications/password-reset - Send password reset email
+    if (path[0] === 'notifications' && path[1] === 'password-reset' && method === 'POST') {
+      const body = await request.json()
+      const { email } = body
+      
+      if (!email) {
+        return err('email is required', 400)
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://biz-ascend-rad.preview.emergentagent.com'
+      // In real implementation, this would generate a secure token
+      const resetUrl = `${baseUrl}#/reset-password?token=demo-token`
+
+      const emailData = {
+        type: 'password_reset',
+        to_email: email,
+        reset_url: resetUrl
+      }
+
+      const result = await sendEmailNotification(emailData)
+      
+      if (result.success) {
+        return json({ success: true, message: 'Password reset email sent' })
+      } else {
+        // Don't reveal if email exists or not for security
+        return json({ success: true, message: 'If an account exists with this email, a reset link has been sent' })
       }
     }
 

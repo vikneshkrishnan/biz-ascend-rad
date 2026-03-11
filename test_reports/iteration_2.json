@@ -1,0 +1,64 @@
+{
+  "summary": "Update mode testing - Added new tests for Forgot Password flow (5 tests). All 21 E2E tests pass including new forgot password tests and existing core-flows, projects, and scores-report tests.",
+  "mode": "update",
+  "baseline_commit": "5a5092ef9797f80eed19079651bbbbbaa7e55a5d",
+  "head_commit": "a174528303a213bef0730795e126806ee941a36c",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Forgot Password",
+        "issues": ["Email field is not cleared when clicking 'Try another email' - minor UX issue, not blocking"]
+      }
+    ]
+  },
+  "regression_results": {
+    "total_specs": 4,
+    "total_tests": 21,
+    "passed": 21,
+    "failed": 0,
+    "skipped": 0
+  },
+  "specs_created": [
+    "/app/tests/e2e/forgot-password.spec.ts"
+  ],
+  "specs_updated": [],
+  "quarantined_tests": [],
+  "test_report_links": [
+    "/app/tests/e2e/core-flows.spec.ts",
+    "/app/tests/e2e/forgot-password.spec.ts",
+    "/app/tests/e2e/projects.spec.ts",
+    "/app/tests/e2e/scores-report.spec.ts"
+  ],
+  "action_items": [],
+  "updated_files": [
+    "/app/tests/e2e/forgot-password.spec.ts"
+  ],
+  "success_rate": {
+    "backend": "N/A (mocked APIs)",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "Using demo mode with mock data from /app/lib/mockData.js",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 21 tests passing. Test coverage includes: demo mode navigation, dashboard stats, theme toggle, projects list/detail, scores page with RAD score/charts/RAPS, AI report generation, PDF download button, forgot password flow (link visible, form display, success state, back to login, try another email). All features tested are MOCKED in demo mode via demoApiFetch.",
+  "features_tested": [
+    "Login page displays Forgot Password link - PASS",
+    "Clicking Forgot Password link shows reset password form - PASS",
+    "Entering email and clicking Send Reset Link shows success state - PASS",
+    "Back to Login button returns to login page - PASS",
+    "Try another email button resets form after success - PASS",
+    "Demo mode Explore Demo button accessible - PASS",
+    "Dashboard navigation in demo mode - PASS",
+    "Dashboard displays stats cards correctly - PASS",
+    "Theme toggle switches between dark/light modes - PASS",
+    "Projects navigation still functional - PASS",
+    "Scores page with charts still working - PASS"
+  ],
+  "notes": "All APIs are MOCKED in demo mode via demoApiFetch in /app/lib/mockData.js. Forgot password flow uses mock implementation that simulates success after 1.5s delay. Real backend integration includes Resend email service (scripts/email_service.py) and API routes (notifications/password-reset) but these are not tested in demo mode."
+}
