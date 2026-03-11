@@ -148,43 +148,51 @@ function LoginPage({ onSuccess, onDemo }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[hsl(222,47%,5%)]">
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        src="/Image_to_video_delpmaspu_.mp4"
+      />
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
             <Zap className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Biz Ascend RAD&trade;</h1>
-          <p className="text-muted-foreground">Revenue Acceleration Diagnostic Platform</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Biz Ascend RAD&trade;</h1>
+          <p className="text-white/70">Revenue Acceleration Diagnostic Platform</p>
         </div>
-        <Card className="border-2">
+        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 backdrop-blur-md login-card">
           <CardContent className="pt-6">
             <form onSubmit={handleLogin} className="space-y-4">
-              {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg border border-destructive/20">{error}</div>}
+              {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">{error}</div>}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required className="h-11" data-testid="login-email-input" />
+                <Label htmlFor="email" className="text-gray-700 font-medium">Email</Label>
+                <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required className="h-11 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="login-email-input" />
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <button type="button" onClick={() => setShowForgotPassword(true)} className="text-xs text-primary hover:underline" data-testid="forgot-password-link">
+                  <Label htmlFor="password" className="text-gray-700 font-medium">Password</Label>
+                  <button type="button" onClick={() => setShowForgotPassword(true)} className="text-xs text-primary hover:underline font-medium" data-testid="forgot-password-link">
                     Forgot password?
                   </button>
                 </div>
-                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required className="h-11" data-testid="login-password-input" />
+                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required className="h-11 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="login-password-input" />
               </div>
-              <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={loading} data-testid="login-submit-btn">
+              <Button type="submit" className="w-full h-11 text-base font-semibold bg-primary hover:bg-primary/90 text-white" disabled={loading} data-testid="login-submit-btn">
                 {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Signing in...</> : 'Sign In'}
-              </Button>
-              <div className="relative"><div className="absolute inset-0 flex items-center"><Separator /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div></div>
-              <Button type="button" variant="outline" className="w-full h-11" onClick={onDemo} data-testid="explore-demo-btn">
-                <Eye className="w-4 h-4 mr-2" />Explore Demo
               </Button>
             </form>
           </CardContent>
         </Card>
-        <p className="text-center text-xs text-muted-foreground">Contact your administrator for account access</p>
+        <Button type="button" variant="outline" className="w-full h-11 border-white/30 text-white bg-transparent hover:bg-transparent hover:border-white/60" onClick={onDemo} data-testid="explore-demo-btn">
+          <Eye className="w-4 h-4 mr-2" />Explore Demo
+        </Button>
+        <p className="text-center text-xs text-white/50">Contact your administrator for account access</p>
       </div>
     </div>
   )
@@ -226,53 +234,62 @@ function ForgotPasswordPage({ onBack }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[hsl(222,47%,5%)]">
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        src="/Image_to_video_delpmaspu_.mp4"
+      />
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
             <Zap className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Reset Password</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight text-white">Reset Password</h1>
+          <p className="text-white/70">
             {sent ? "Check your inbox for the reset link" : "Enter your email to receive a reset link"}
           </p>
         </div>
-        <Card className="border-2">
+        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 backdrop-blur-md login-card">
           <CardContent className="pt-6 space-y-6">
             {sent ? (
               <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+                <div className="p-4 rounded-xl bg-green-50 border border-green-200 text-center">
                   <CheckCircle2 className="w-8 h-8 mx-auto text-green-500 mb-2" />
-                  <p className="text-green-600 dark:text-green-400 font-medium">Reset link sent!</p>
-                  <p className="text-sm text-muted-foreground mt-1">We've sent a password reset link to <strong>{email}</strong></p>
+                  <p className="text-green-700 font-medium">Reset link sent!</p>
+                  <p className="text-sm text-gray-500 mt-1">We've sent a password reset link to <strong className="text-gray-700">{email}</strong></p>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
+                <p className="text-xs text-gray-400 text-center">
                   Didn't receive the email? Check your spam folder or try again.
                 </p>
-                <Button variant="outline" className="w-full" onClick={() => setSent(false)}>
+                <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50" onClick={() => setSent(false)}>
                   Try another email
                 </Button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email Address</Label>
-                  <Input 
-                    id="reset-email" 
-                    type="email" 
-                    value={email} 
-                    onChange={e => setEmail(e.target.value)} 
-                    placeholder="you@company.com" 
-                    className="h-11"
+                  <Label htmlFor="reset-email" className="text-gray-700 font-medium">Email Address</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    className="h-11 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary"
                     data-testid="forgot-email-input"
                   />
                 </div>
-                <Button type="submit" className="w-full h-11" disabled={loading} data-testid="forgot-submit-btn">
+                <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90 text-white" disabled={loading} data-testid="forgot-submit-btn">
                   {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : 'Send Reset Link'}
                 </Button>
               </form>
             )}
-            <Button variant="ghost" className="w-full" onClick={onBack} data-testid="back-to-login-btn">
+            <Button variant="ghost" className="w-full text-gray-600 hover:text-gray-900 hover:bg-gray-50" onClick={onBack} data-testid="back-to-login-btn">
               <ArrowLeft className="w-4 h-4 mr-2" />Back to Login
             </Button>
           </CardContent>
