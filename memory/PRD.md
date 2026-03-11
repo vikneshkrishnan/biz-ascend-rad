@@ -4,14 +4,15 @@
 Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants diagnose, score, and accelerate client revenue growth systems.
 
 ## Tech Stack
-- **Frontend**: Next.js 14, React 18, TanStack Query, shadcn/ui, Tailwind CSS
+- **Frontend**: Next.js 14, React 18, TanStack Query, shadcn/ui, Tailwind CSS, Recharts
 - **Backend**: Next.js API Routes → Supabase (PostgreSQL)
 - **Auth**: Supabase Auth (email/password)
 - **Database**: Supabase (PostgreSQL via REST API)
 - **AI Integration**: Claude Sonnet 4 via Emergent LLM Key
+- **PDF Generation**: WeasyPrint (Python)
 - **Theme**: Dark mode (black + orange) / Light mode (colorful cards)
 
-## Completed Features (Phase 1 MVP)
+## Completed Features
 
 ### Core UI & Navigation
 - [x] Authentication (Login + Session + Role-based: admin/consultant)
@@ -19,21 +20,23 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - [x] Dashboard (overview cards, recent activity, sector distribution)
 - [x] Project Management (list, create, detail, archive)
 - [x] Dark/Light Theme Toggle
-- [x] Responsive Design (desktop + mobile)
+- [x] Responsive Design (desktop + tablet + mobile)
 - [x] App Shell with collapsible sidebar
 
 ### Questionnaires
 - [x] Screener Questionnaire (7 sections, 20 questions, stepper, auto-save)
-- [x] Diagnostic Assessment (7 pillars, 54 questions, card options, auto-save, conditional branching)
+- [x] Diagnostic Assessment (7 pillars, 54 questions, card options, auto-save)
 - [x] Public Questionnaire (combined screener + diagnostic, no auth required)
 - [x] Questionnaire Link Management (generate, copy, invalidate)
 
 ### Scoring & Analytics
 - [x] Scoring Engine (RAD Score, maturity bands, pillar scores, primary constraint, RAPS)
 - [x] Scores Visualization (heatmap, traffic lights, RAPS breakdown)
+- [x] **Radar Chart** - Pillar performance visualization (Recharts)
+- [x] **Bar Chart** - Horizontal pillar scores comparison (Recharts)
 - [x] Reassessment Support (start new assessment, history table)
 
-### AI Report Generation (NEW - Completed Dec 2025)
+### AI Report Generation
 - [x] Claude AI Integration via Emergent LLM Key
 - [x] Python script for AI report generation (`/app/scripts/generate_report.py`)
 - [x] API endpoint: POST `/api/projects/:id/report/generate`
@@ -46,7 +49,14 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - [x] 30-60-90 Day Action Plan generation
 - [x] Market Opportunity Report (per-country macro analysis)
 - [x] Report viewing dialog with comprehensive display
-- [x] Demo mode mock report data
+
+### PDF Report Download (NEW - Dec 2025)
+- [x] WeasyPrint integration for PDF generation (`/app/scripts/generate_pdf.py`)
+- [x] API endpoint: GET `/api/projects/:id/report/pdf`
+- [x] Professional presentation-grade PDF layout
+- [x] Includes: Executive Summary, Pillar Analysis, RAPS, Action Plan
+- [x] Base64 encoded PDF download with auto-filename
+- [x] "Download PDF" button in UI
 
 ### Admin Features
 - [x] Admin User Management (CRUD, activate/deactivate)
@@ -55,9 +65,8 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 ## Pending Features (Phase 2+)
 
 ### High Priority (P1)
-- [ ] PDF Report Download (weasyprint integration)
-- [ ] Score Trend Charts (reassessment comparison with Recharts)
-- [ ] Mobile Responsiveness Verification
+- [ ] Score Trend Line Chart (show RAD score progression across reassessments)
+- [ ] Supabase live integration (currently demo mode only)
 
 ### Medium Priority (P2)
 - [ ] Forgot Password flow
@@ -88,12 +97,15 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 │   ├── supabase.js           # Supabase client
 │   └── utils.js              # Utility functions
 ├── scripts/
-│   └── generate_report.py    # Claude AI report generation
+│   ├── generate_report.py    # Claude AI report generation
+│   └── generate_pdf.py       # WeasyPrint PDF generation
 ├── tests/
 │   └── e2e/                  # Playwright tests
 │       ├── core-flows.spec.ts
 │       ├── projects.spec.ts
 │       └── scores-report.spec.ts
+├── test_reports/
+│   └── iteration_1.json      # Latest test results
 └── migrations/
     └── 001_initial_schema.sql
 ```
@@ -122,6 +134,7 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - `GET /api/projects/:id/scores` - Get calculated scores
 - `POST /api/projects/:id/report/generate` - Generate AI report
 - `GET /api/projects/:id/report` - Get generated report
+- `GET /api/projects/:id/report/pdf` - Download PDF report
 
 ### Public Assessment
 - `GET /api/assess/:token` - Get public questionnaire data
@@ -134,22 +147,16 @@ Revenue Acceleration Diagnostic platform for B2B growth consulting. Consultants 
 - `PATCH /api/users/:id` - Update user (admin only)
 - `GET /api/admin/stats` - Platform statistics
 
-## Environment Variables
+## Test Results (Latest)
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-EMERGENT_LLM_KEY=sk-emergent-xxx
-NEXT_PUBLIC_BASE_URL=https://biz-ascend-rad.preview.emergentagent.com
+```json
+{
+  "total_tests": 16,
+  "passed": 16,
+  "failed": 0,
+  "success_rate": "100%"
+}
 ```
-
-## Setup Instructions
-
-1. Run `/app/migrations/001_initial_schema.sql` in Supabase SQL Editor
-2. Create admin user in Supabase Auth dashboard
-3. Update profile role: `UPDATE profiles SET role = 'admin' WHERE email = 'your@email.com'`
-4. Set environment variables in `.env`
 
 ## Demo Mode
 
@@ -157,12 +164,14 @@ Access the full UI without Supabase setup:
 1. Navigate to the login page
 2. Click "Explore Demo" button
 3. Full platform is accessible with mock data
+4. Navigate to Projects → Select project → View Scores
+5. Use "Generate AI Report", "View Report", "Download PDF" buttons
 
-## Testing
+## Changelog
 
-Test files located at `/app/tests/e2e/`:
-- `core-flows.spec.ts` - Navigation and theme tests
-- `projects.spec.ts` - Project management tests
-- `scores-report.spec.ts` - Scores and AI report tests
-
-Run tests: `cd /app/tests && npx playwright test`
+### Dec 11, 2025
+- Added PDF report download with WeasyPrint
+- Added Radar chart for pillar performance visualization
+- Added Bar chart for pillar scores comparison
+- Fixed mobile responsiveness (tablet view verified)
+- All 16 E2E tests passing
