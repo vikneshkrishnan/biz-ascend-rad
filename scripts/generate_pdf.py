@@ -16,17 +16,19 @@ PILLAR_NAMES = {
     'p3': 'Positioning & Competitive Clarity',
     'p4': 'Sales System Repeatability',
     'p5': 'Pipeline Generation',
-    'p6': 'Revenue Economics',
+    'p6': 'Revconomics',
     'p7': 'Strategic Constraints',
+    'p8': 'Organisational Alignment & Capability',
+    'p9': 'Systems Readiness & AI Transformation',
 }
 
 def get_band_color(score):
     if score >= 80:
         return '#22c55e'
-    elif score >= 60:
+    elif score >= 65:
+        return '#84cc16'
+    elif score >= 50:
         return '#f59e0b'
-    elif score >= 40:
-        return '#f97316'
     return '#ef4444'
 
 def get_traffic_light(avg):

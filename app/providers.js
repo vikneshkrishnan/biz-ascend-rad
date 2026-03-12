@@ -3,39 +3,22 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from '@/components/ui/sonner'
 import { useState, createContext, useContext, useEffect } from 'react'
 
-const ThemeContext = createContext({ isDark: true, toggle: () => {} })
+const ThemeContext = createContext({ isDark: false, toggle: () => {} })
 export function useCustomTheme() { return useContext(ThemeContext) }
 
 function ThemeManager({ children }) {
-  const [isDark, setIsDark] = useState(true)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    const stored = localStorage.getItem('rad-theme')
-    const prefersDark = stored ? stored === 'dark' : true
-    setIsDark(prefersDark)
-    if (prefersDark) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
+    document.documentElement.classList.remove('dark')
+    document.documentElement.style.colorScheme = 'light'
   }, [])
-
-  function toggle() {
-    setIsDark(prev => {
-      const newDark = !prev
-      localStorage.setItem('rad-theme', newDark ? 'dark' : 'light')
-      document.documentElement.classList.toggle('dark', newDark)
-      document.documentElement.style.colorScheme = newDark ? 'dark' : 'light'
-      return newDark
-    })
-  }
 
   if (!mounted) return null
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggle }}>
+    <ThemeContext.Provider value={{ isDark: false, toggle: () => {} }}>
       {children}
     </ThemeContext.Provider>
   )

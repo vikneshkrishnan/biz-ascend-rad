@@ -124,11 +124,11 @@ async function logActivity(userId, projectId, action, details = {}) {
 
 // Scoring engine
 function calculateScores(diagnosticResponses, screenerResponses) {
-  const pillarWeights = { p1: 0.15, p2: 0.15, p3: 0.15, p4: 0.15, p5: 0.15, p6: 0.15, p7: 0.10 }
+  const pillarWeights = { p1: 0.12, p2: 0.11, p3: 0.15, p4: 0.15, p5: 0.10, p6: 0.07, p7: 0.08, p8: 0.10, p9: 0.12 }
   const pillarScores = {}
   let totalWeightedScore = 0
   let lowestPillar = { id: null, score: 101, name: '' }
-  const pillarNames = { p1: 'Commercial Baseline', p2: 'ICP & Buyer Urgency', p3: 'Positioning & Competitive Clarity', p4: 'Sales System Repeatability', p5: 'Pipeline Generation', p6: 'Revenue Economics', p7: 'Strategic Constraints' }
+  const pillarNames = { p1: 'Commercial Baseline', p2: 'ICP & Buyer Urgency', p3: 'Positioning & Competitive Clarity', p4: 'Sales System Repeatability', p5: 'Pipeline Generation', p6: 'Revconomics', p7: 'Strategic Constraints', p8: 'Organisational Alignment & Capability', p9: 'Systems Readiness & AI Transformation' }
 
   for (const [pillarId, weight] of Object.entries(pillarWeights)) {
     const responses = Object.entries(diagnosticResponses || {})
@@ -145,8 +145,8 @@ function calculateScores(diagnosticResponses, screenerResponses) {
   const radScore = Math.round(totalWeightedScore * 10) / 10
   let maturityBand = 'Growth System At Risk'
   if (radScore >= 80) maturityBand = 'Growth Engine Strong'
-  else if (radScore >= 60) maturityBand = 'Growth System Developing'
-  else if (radScore >= 40) maturityBand = 'Growth System Fragile'
+  else if (radScore >= 65) maturityBand = 'Growth System Constrained'
+  else if (radScore >= 50) maturityBand = 'Growth System Underpowered'
 
   // RAPS calculation
   let raps = null

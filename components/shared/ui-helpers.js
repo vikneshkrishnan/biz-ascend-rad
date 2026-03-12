@@ -27,7 +27,7 @@ export function GlassCard({ children, className, glow = true, ...props }) {
   return (
     <div 
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-white/10 dark:border-white/5 bg-white/70 dark:bg-black/40 backdrop-blur-xl shadow-xl transition-all duration-500 hover:shadow-primary/5 hover:-translate-y-1",
+        "relative overflow-hidden rounded-3xl border border-white/20 dark:border-white/5 bg-white/60 dark:bg-zinc-900/40 backdrop-blur-2xl shadow-2xl transition-all duration-500 hover:shadow-primary/5 hover:-translate-y-1.5",
         glow && "before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-primary/10 before:via-transparent before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity duration-700",
         className
       )}
@@ -40,46 +40,48 @@ export function GlassCard({ children, className, glow = true, ...props }) {
 
 export function StatCard({ label, value, icon: Icon, trend, color, className }) {
   return (
-    <GlassCard className={cn("group p-6", className)}>
-      <div className="flex items-start justify-between">
-        <div className="space-y-4 flex-1">
-          <div className={cn("inline-flex p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 transition-transform group-hover:scale-110 duration-500", color)}>
-            <Icon className="w-6 h-6" />
+    <GlassCard className={cn("group p-7 relative", className)}>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div className={cn("inline-flex p-3.5 rounded-2xl bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/5 transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 shadow-sm", color)}>
+            <Icon className="w-6 h-6 stroke-[2.5px]" />
           </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground/80 tracking-wide uppercase">{label}</p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <p className="text-3xl font-black tracking-tight">{value}</p>
-              {trend && (
-                <div className={cn(
-                  "flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full border bg-white/5",
-                  trend > 0 ? "text-green-500 border-green-500/20" : "text-red-500 border-red-500/20"
-                )}>
-                  {trend > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {Math.abs(trend)}%
-                </div>
-              )}
+          {trend && (
+            <div className={cn(
+              "flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full border shadow-sm",
+              trend > 0 ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20"
+            )}>
+              {trend > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+              {Math.abs(trend)}%
             </div>
-          </div>
+          )}
         </div>
         
-        {/* Subtle trend line visualization (simulated) */}
-        <div className="h-12 w-20 self-center opacity-30 group-hover:opacity-60 transition-opacity">
-          <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible">
-            <path 
-              d={trend > 0 ? "M0 35 Q 25 35, 50 20 T 100 5" : "M0 5 Q 25 5, 50 20 T 100 35"} 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="3"
-              strokeLinecap="round"
-              className={trend > 0 ? "text-green-500" : "text-red-500"}
-            />
-          </svg>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-muted-foreground/70 tracking-tight uppercase">{label}</p>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-4xl font-bold tracking-tighter tabular-nums">{value}</p>
+            
+            {/* Subtle sparkline-style trend line */}
+            <div className="h-10 w-24 opacity-20 group-hover:opacity-100 transition-all duration-700 transform group-hover:translate-x-1">
+              <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible">
+                <path 
+                  d={trend > 0 ? "M0 35 L 20 30 L 40 32 L 60 15 L 80 18 L 100 5" : "M0 5 L 20 15 L 40 12 L 60 25 L 80 22 L 100 35"} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={trend > 0 ? "text-emerald-500" : "text-rose-500"}
+                />
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
       
       {/* Subtle background glow */}
-      <div className={cn("absolute -bottom-6 -right-6 w-24 h-24 blur-3xl rounded-full opacity-10 pointer-events-none bg-current group-hover:opacity-20 transition-opacity duration-700", color)} />
+      <div className={cn("absolute -bottom-8 -right-8 w-32 h-32 blur-[60px] rounded-full opacity-10 pointer-events-none bg-current group-hover:opacity-30 transition-opacity duration-700", color)} />
     </GlassCard>
   )
 }

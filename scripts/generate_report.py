@@ -8,7 +8,8 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 PILLAR_NAMES = {
     'p1': 'Commercial Baseline', 'p2': 'ICP & Buyer Urgency',
     'p3': 'Positioning & Competitive Clarity', 'p4': 'Sales System Repeatability',
-    'p5': 'Pipeline Generation', 'p6': 'Revenue Economics', 'p7': 'Strategic Constraints',
+    'p5': 'Pipeline Generation', 'p6': 'Revconomics', 'p7': 'Strategic Constraints',
+    'p8': 'Organisational Alignment & Capability', 'p9': 'Systems Readiness & AI Transformation',
 }
 
 async def generate_report(data):
@@ -38,6 +39,8 @@ async def generate_report(data):
 
     qualitative_p3 = diagnostic.get('p3_q12', 'Not provided')
     qualitative_p7 = diagnostic.get('p7_q6', 'Not provided')
+    qualitative_p8 = diagnostic.get('p8_q13', 'Not provided')
+    qualitative_p9 = diagnostic.get('p9_q13', 'Not provided')
     positioning = screener.get('q12', 'Not provided')
     competitors = screener.get('q13', 'Not provided')
     markets = screener.get('q6', 'Not provided')
@@ -71,6 +74,8 @@ PILLAR SCORES:
 QUALITATIVE RESPONSES:
 - Positioning Challenge (P3-Q12): {qualitative_p3}
 - Strategic Constraint (P7-Q6): {qualitative_p7}
+- Organisational Alignment (P8-Q13): {qualitative_p8}
+- Systems & AI Readiness (P9-Q13): {qualitative_p9}
 
 RAPS DATA:
 - RAPS Score: {raps.get('score', 0)}%
@@ -89,8 +94,10 @@ Return a JSON object with these exact keys. Each narrative should be 2-4 sentenc
     "p3": "narrative for Positioning & Competitive Clarity",
     "p4": "narrative for Sales System Repeatability",
     "p5": "narrative for Pipeline Generation",
-    "p6": "narrative for Revenue Economics",
-    "p7": "narrative for Strategic Constraints"
+    "p6": "narrative for Revconomics",
+    "p7": "narrative for Strategic Constraints",
+    "p8": "narrative for Organisational Alignment & Capability",
+    "p9": "narrative for Systems Readiness & AI Transformation"
   }},
   "positioning_assessment": "2-3 paragraphs on positioning potency based on the positioning statement, competitors, and P3 scores",
   "strategic_moat_score": <number 1-10>,

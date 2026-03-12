@@ -134,12 +134,12 @@ export function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{user.email}</TableCell>
                     <TableCell>
-                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="uppercase">
                         {user.role}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={user.status === 'active' ? 'outline' : 'destructive'} className="capitalize">
+                      <Badge variant={user.status === 'active' ? 'outline' : 'destructive'} className="uppercase">
                         {user.status || 'active'}
                       </Badge>
                     </TableCell>

@@ -88,11 +88,8 @@ export function AppShell({ children }) {
             <Menu className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2 ml-auto">
-            <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} data-testid="theme-toggle">
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </Button>
             {isDemoMode() && <Badge variant="outline" className="border-primary text-primary">Demo</Badge>}
-            <Badge variant="secondary" className="capitalize">{profile?.role}</Badge>
+            <Badge variant="secondary" className="uppercase">{profile?.role}</Badge>
             <Button variant="ghost" size="sm" onClick={logout} data-testid="logout-btn">
               <LogOut className="w-4 h-4 mr-2" />Logout
             </Button>

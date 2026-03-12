@@ -6,10 +6,11 @@ import { toast } from 'sonner'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, FolderKanban, Users, LogOut, Sun, Moon, Zap, Plus, Search,
-  ChevronRight, ArrowLeft, Activity, CheckCircle2, Clock, AlertTriangle, Copy,
+  ChevronRight, ArrowLeft, Activity as ActivityIcon, CheckCircle2, Clock, AlertTriangle, Copy,
   PanelLeftClose, PanelLeftOpen, MoreVertical, Building2, FileText, Link2,
   TrendingUp, Shield, Trash2, Edit, BarChart3, Eye, EyeOff, ChevronLeft, Menu, X,
-  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download, FileSpreadsheet, Mail, Send, Settings, Building
+  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download, FileSpreadsheet, Mail, Send, Settings, Building,
+  ArrowUpRight, Bell, Briefcase
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,9 +28,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Cell, AreaChart, Area, Tooltip as RechartsTooltip } from 'recharts'
 import { INDUSTRIES, SCREENER_SECTIONS, DIAGNOSTIC_PILLARS, MATURITY_BANDS, PILLAR_NAMES, FREE_EMAIL_DOMAINS, MONTHS } from '@/lib/constants'
 import { DEMO_PROFILE, DEMO_USERS, DEMO_PROJECTS, DEMO_STATS, DEMO_ACTIVITY, demoApiFetch } from '@/lib/mockData'
+import { cn } from '@/lib/utils'
+import { GlassCard, StatCard, GlowEffect, StatusBadge as UIStatusBadge, PageSkeleton as UIPageSkeleton } from '@/components/shared/ui-helpers'
 
 // ===== DEMO MODE =====
 let _demoMode = false
@@ -73,7 +77,7 @@ function useRouter() {
 }
 
 function matchRoute(hash) {
-  if (hash === '/dashboard') return { page: 'dashboard' }
+  if (hash === '/dashboard' || hash === '/') return { page: 'dashboard' }
   if (hash === '/signup') return { page: 'signup' }
   if (hash === '/admin/users') return { page: 'admin-users' }
   if (hash === '/admin/organization') return { page: 'admin-organization' }
@@ -96,7 +100,7 @@ function matchRoute(hash) {
 const CARD_COLORS = [
   'bg-blue-700 text-white dark:bg-card dark:text-card-foreground border-blue-800 dark:border-primary/20',
   'bg-emerald-700 text-white dark:bg-card dark:text-card-foreground border-emerald-800 dark:border-primary/20',
-  'bg-orange-600 text-white dark:bg-card dark:text-card-foreground border-orange-700 dark:border-primary/20',
+  'bg-zinc-900 text-white dark:bg-card dark:text-card-foreground border-zinc-800 dark:border-primary/20',
   'bg-red-700 text-white dark:bg-card dark:text-card-foreground border-red-800 dark:border-primary/20',
   'bg-violet-700 text-white dark:bg-card dark:text-card-foreground border-violet-800 dark:border-primary/20',
   'bg-sky-700 text-white dark:bg-card dark:text-card-foreground border-sky-800 dark:border-primary/20',
@@ -113,7 +117,7 @@ function StatusBadge({ status }) {
     expired: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
   }
   const labels = { draft: 'Draft', in_progress: 'In Progress', completed: 'Completed', archived: 'Archived', not_started: 'Not Started', active: 'Active', expired: 'Expired' }
-  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status] || styles.draft}`}>{labels[status] || status}</span>
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium uppercase ${styles[status] || styles.draft}`}>{labels[status] || status}</span>
 }
 
 function LoadingScreen() {
@@ -491,9 +495,6 @@ function AppShell({ children }) {
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl" data-testid="theme-toggle">
-              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </Button>
             {isDemoMode() && <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">Demo</Badge>}
             <Badge variant="outline" className="capitalize hidden sm:flex">{profile?.role}</Badge>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
@@ -510,82 +511,353 @@ function AppShell({ children }) {
 }
 
 // ===== DASHBOARD =====
+const ACTION_ICONS = {
+  'project_created': FolderKanban,
+  'project_updated': Clock,
+  'project_completed': CheckCircle2,
+  'user_login': ActivityIcon,
+  'score_generated': Zap,
+}
+
 function DashboardPage() {
   const { profile, navigate } = useAuth()
-  const { data: stats, isLoading } = useQuery({ queryKey: ['stats'], queryFn: () => apiFetch('/admin/stats') })
-  const { data: activityData } = useQuery({ queryKey: ['activity'], queryFn: () => apiFetch('/activity?limit=5') })
+  const { data: stats, isLoading: statsLoading } = useQuery({ queryKey: ['stats'], queryFn: () => apiFetch('/admin/stats') })
+  const { data: activityData, isLoading: activityLoading } = useQuery({ queryKey: ['activity'], queryFn: () => apiFetch('/activity') })
+  const { data: projects, isLoading: projectsLoading } = useQuery({ queryKey: ['projects'], queryFn: () => apiFetch('/projects') })
 
-  if (isLoading) return <PageSkeleton />
-  const activity = activityData?.activities || []
-  const cards = [
-    { label: 'Total Projects', value: stats?.total_projects || 0, icon: FolderKanban, desc: 'All-time projects' },
-    { label: 'Active Diagnostics', value: stats?.active_diagnostics || 0, icon: Activity, desc: 'In progress' },
-    { label: 'Completed', value: stats?.completed_diagnostics || 0, icon: CheckCircle2, desc: 'Diagnostics done' },
-    ...(profile?.role === 'admin' ? [{ label: 'Consultants', value: stats?.total_consultants || 0, icon: Users, desc: 'Active users' }] : []),
+  if (statsLoading) return <UIPageSkeleton />
+
+  const isAdmin = profile?.role === 'admin'
+  const activities = activityData?.activities || []
+  
+  const statCards = isAdmin ? [
+    { label: 'Total Projects', value: stats?.total_projects || 0, icon: FolderKanban, color: 'text-primary', trend: 12 },
+    { label: 'Active Diagnostics', value: stats?.active_diagnostics || 0, icon: ActivityIcon, color: 'text-blue-500', trend: -3 },
+    { label: 'Completed', value: stats?.completed_diagnostics || 0, icon: CheckCircle2, color: 'text-emerald-500', trend: 8 },
+    { label: 'Consultants', value: stats?.total_consultants || 0, icon: Building2, color: 'text-violet-500', trend: 5 },
+  ] : [
+    { label: 'My Projects', value: projects?.length || 0, icon: FolderKanban, color: 'text-primary', trend: 5 },
+    { label: 'Completed', value: projects?.filter(p => p.status === 'completed').length || 0, icon: CheckCircle2, color: 'text-emerald-500', trend: 2 },
+    { label: 'Active', value: projects?.filter(p => p.status === 'active' || p.status === 'in_progress').length || 0, icon: Clock, color: 'text-blue-500', trend: -1 },
+    { label: 'Reports', value: projects?.filter(p => p.report_generated).length || 0, icon: Zap, color: 'text-amber-500', trend: 3 },
   ]
 
-  return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Welcome back, {profile?.name}</p>
+  const sectorData = stats?.sectors ? Object.entries(stats.sectors).map(([name, value]) => ({ name, value })) : []
+  const COLORS = ['#000000', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#f59e0b']
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-3 rounded-2xl shadow-2xl">
+          <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+          <p className="text-xl font-bold tracking-tight">{payload[0].value}</p>
         </div>
-        <Button onClick={() => navigate('/projects/new')} className="shadow-md"><Plus className="w-4 h-4 mr-2" />New Project</Button>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((card, i) => (
-          <Card key={i} className={`border-2 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${CARD_COLORS[i]}`}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-white/80 dark:text-muted-foreground">{card.label}</p>
-                  <p className="text-4xl font-bold mt-2 tracking-tight text-white dark:text-foreground">{card.value}</p>
-                  <p className="text-xs text-white/70 dark:text-muted-foreground mt-1">{card.desc}</p>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white/20 dark:bg-primary/10"><card.icon className="w-5 h-5 text-white dark:text-primary" /></div>
-              </div>
-            </CardContent>
-          </Card>
+      );
+    }
+    return null;
+  };
+
+  const formatActivityDetails = (details) => {
+    if (!details) return 'Action completed successfully';
+    if (typeof details === 'string') return details;
+    if (typeof details === 'object' && Object.keys(details).length > 0) {
+      if (details.status) return `Status updated to ${details.status}`;
+      if (details.industry) return `Industry set to ${details.industry}`;
+      return 'System event recorded';
+    }
+    return 'Action completed successfully';
+  };
+
+  return (
+    <div className="relative space-y-8 bg-transparent px-2">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      <div className="absolute bottom-1/4 right-0 w-[400px] h-[400px] bg-blue-500/5 blur-[100px] rounded-full pointer-events-none -z-10" />
+
+      {/* Header Section */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+            <LayoutDashboard className="w-3 h-3" />
+            Executive Dashboard
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Welcome, <span className="text-primary">{profile?.name?.split(' ')[0] || 'User'}</span>
+          </h1>
+          <p className="text-muted-foreground font-medium max-w-xl">
+            {isAdmin 
+              ? "Platform metrics are showing strong growth across all sectors." 
+              : "You're on track to complete your quarterly growth objectives."}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-2xl px-3 py-2 shadow-sm">
+            <Search className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground pr-8">Search anything...</span>
+            <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border">⌘K</kbd>
+          </div>
+          <Button variant="outline" size="icon" className="rounded-2xl border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-zinc-900">
+            <Bell className="w-4 h-4" />
+          </Button>
+          {!isAdmin && (
+            <Button className="rounded-2xl shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all font-semibold px-6 h-11" onClick={() => navigate('/projects/new')}>
+              <Plus className="w-4 h-4 mr-2" />
+              New Project
+            </Button>
+          )}
+        </div>
+      </header>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {statCards.map((stat, i) => (
+          <StatCard key={i} {...stat} className={cn(
+            "animate-in fade-in slide-in-from-bottom-4 duration-700",
+            i === 0 ? "delay-0" : i === 1 ? "delay-100" : i === 2 ? "delay-200" : "delay-300"
+          )} />
         ))}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-2">
-          <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><Activity className="w-5 h-5 text-primary" />Recent Activity</CardTitle></CardHeader>
-          <CardContent>
-            {activity.length === 0 ? (
-              <div className="text-center py-12">
-                <FolderKanban className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                <p className="text-muted-foreground">No recent activity</p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate('/projects/new')}>Create your first project</Button>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        {/* Main Content Area */}
+        <div className="xl:col-span-2 space-y-8">
+          <Tabs defaultValue="analytics" className="w-full">
+            <div className="flex items-center justify-between mb-6">
+              <TabsList className="bg-zinc-100 dark:bg-zinc-900 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-800 h-11">
+                <TabsTrigger value="analytics" className="rounded-xl px-6 font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm">Overview</TabsTrigger>
+                <TabsTrigger value="activity" className="rounded-xl px-6 font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm">Activity</TabsTrigger>
+              </TabsList>
+              <Button variant="ghost" size="sm" className="rounded-xl font-semibold text-muted-foreground gap-2">
+                Last 30 Days
+                <ChevronRight className="w-4 h-4 rotate-90" />
+              </Button>
+            </div>
+
+            <TabsContent value="analytics" className="m-0 focus-visible:outline-none">
+              <div className="grid gap-8">
+                {isAdmin ? (
+                  <GlassCard className="p-0 border-none bg-transparent shadow-none hover:translate-y-0">
+                    <CardHeader className="pt-0 pb-6 flex flex-row items-center justify-between">
+                      <div className="space-y-1">
+                        <CardTitle className="text-xl font-bold tracking-tight">Industry Distribution</CardTitle>
+                        <CardDescription>Live breakdown of projects across key economic sectors</CardDescription>
+                      </div>
+                      <Badge variant="secondary" className="rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none font-bold uppercase tracking-widest text-[10px] px-2.5 py-1">
+                        Real-time
+                      </Badge>
+                    </CardHeader>
+                    <GlassCard className="p-8 min-h-[400px]">
+                      {sectorData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={320}>
+                          <BarChart data={sectorData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                              {COLORS.map((color, i) => (
+                                <linearGradient key={`grad-${i}`} id={`barGrad-${i}`} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                  <stop offset="100%" stopColor={color} stopOpacity={0.4} />
+                                </linearGradient>
+                              ))}
+                            </defs>
+                            <CartesianGrid strokeDasharray="8 8" stroke="currentColor" className="text-zinc-200 dark:text-zinc-800" vertical={false} />
+                            <XAxis 
+                              dataKey="name" 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: 'currentColor', fontSize: 11, fontWeight: 600 }}
+                              dy={15}
+                              className="text-muted-foreground"
+                            />
+                            <YAxis 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: 'currentColor', fontSize: 11, fontWeight: 600 }}
+                              className="text-muted-foreground"
+                            />
+                            <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'currentColor', opacity: 0.05 }} />
+                            <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={45}>
+                              {sectorData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={`url(#barGrad-${index % COLORS.length})`} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-[320px] flex flex-col items-center justify-center text-muted-foreground gap-4">
+                          <div className="p-6 rounded-3xl bg-zinc-100 dark:bg-zinc-800/50">
+                            <BarChart3 className="w-12 h-12 opacity-20" />
+                          </div>
+                          <p className="font-medium">Collecting sector-specific data...</p>
+                        </div>
+                      )}
+                    </GlassCard>
+                  </GlassCard>
+                ) : (
+                  <GlassCard className="p-10 bg-gradient-to-br from-primary/10 via-transparent to-blue-500/5 border-primary/10 hover:translate-y-0 shadow-sm">
+                    <div className="flex flex-col md:flex-row gap-10 items-center">
+                      <div className="space-y-6 flex-1">
+                        <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none px-3 py-1 rounded-full font-bold tracking-[0.15em] text-[10px] uppercase">
+                          Revenue Acceleration
+                        </Badge>
+                        <h2 className="text-3xl font-bold tracking-tight leading-tight">
+                          Unlock hidden growth potential in your business model
+                        </h2>
+                        <p className="text-muted-foreground text-lg leading-relaxed font-medium">
+                          Our RAD™ diagnostic identifies bottlenecks and reveals scaling opportunities within minutes.
+                        </p>
+                        <Button size="lg" className="rounded-2xl font-bold px-8 h-12 shadow-xl shadow-primary/20" onClick={() => navigate('/projects/new')}>
+                          Run New Diagnostic
+                          <ArrowUpRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </div>
+                      <div className="relative hidden md:block">
+                        <div className="absolute inset-0 bg-primary/20 blur-[80px] rounded-full animate-pulse" />
+                        <div className="relative p-10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[3rem] shadow-2xl">
+                          <Zap className="w-20 h-20 text-primary" />
+                        </div>
+                      </div>
+                    </div>
+                  </GlassCard>
+                )}
               </div>
-            ) : (
-              <div className="space-y-3">{activity.map((item, i) => (
-                <div key={i} className="flex items-start gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm">{item.action}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString()}</p>
-                  </div>
+            </TabsContent>
+
+            <TabsContent value="activity" className="m-0 focus-visible:outline-none">
+              <GlassCard className="p-8">
+                <div className="space-y-6">
+                  {activityLoading ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
+                    </div>
+                  ) : activities.length > 0 ? (
+                    activities.slice(0, 8).map((item, i) => {
+                      const Icon = ACTION_ICONS[item.action_type] || ActivityIcon
+                      return (
+                        <div key={i} className="group relative flex items-start gap-5 p-4 rounded-2xl hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors border border-transparent hover:border-zinc-100 dark:hover:border-zinc-800">
+                          <div className="relative flex-shrink-0">
+                            <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center group-hover:scale-110 group-hover:bg-primary/10 group-hover:text-primary transition-all duration-500">
+                              <Icon className="w-5 h-5 stroke-[2.5px]" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-bold tracking-tight">{String(item.action || 'System Action')}</p>
+                              <span className="text-[11px] font-semibold text-muted-foreground bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
+                                {item.created_at ? new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Recently'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground font-medium line-clamp-1">{formatActivityDetails(item.details)}</p>
+                          </div>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="py-20 text-center space-y-4">
+                      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+                        <ActivityIcon className="w-8 h-8 text-muted-foreground opacity-20" />
+                      </div>
+                      <p className="text-muted-foreground font-medium">No activity recorded yet</p>
+                    </div>
+                  )}
+                  <Button variant="ghost" className="w-full rounded-2xl font-bold text-sm text-muted-foreground hover:text-primary mt-4">
+                    View Full Audit Log
+                  </Button>
                 </div>
-              ))}</div>
-            )}
-          </CardContent>
-        </Card>
-        {profile?.role === 'admin' && stats?.sectors && Object.keys(stats.sectors).length > 0 && (
-          <Card className="border-2">
-            <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" />Sector Distribution</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-3">{Object.entries(stats.sectors).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([sector, count], i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0"><p className="text-sm truncate">{sector}</p></div>
-                  <div className="w-32 h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(count / Math.max(...Object.values(stats.sectors))) * 100}%` }} /></div>
-                  <span className="text-sm font-medium w-6 text-right">{count}</span>
+              </GlassCard>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Sidebar Area: Projects & Quick Actions */}
+        <div className="space-y-8">
+          <GlassCard className="flex flex-col h-[650px]">
+            <CardHeader className="flex flex-row items-center justify-between pb-6">
+              <div className="space-y-1">
+                <CardTitle className="text-xl font-bold tracking-tight">Recent Projects</CardTitle>
+                <CardDescription className="text-xs">Your active diagnostic pipeline</CardDescription>
+              </div>
+              <Button variant="ghost" size="icon" className="rounded-xl hover:bg-primary/10 text-primary h-9 w-9" onClick={() => navigate('/projects')}>
+                <ArrowUpRight className="w-5 h-5" />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
+              <ScrollArea className="flex-1 px-6 pb-6">
+                <div className="space-y-4">
+                  {projectsLoading ? (
+                    Array(5).fill(0).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-3xl" />)
+                  ) : projects?.length > 0 ? (
+                    projects.slice(0, 10).map(project => (
+                      <div 
+                        key={project.id} 
+                        className="group flex flex-col p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 bg-white/40 dark:bg-zinc-900/40 hover:border-primary/30 hover:bg-primary/5 transition-all duration-500 cursor-pointer relative overflow-hidden"
+                        onClick={() => navigate(`/projects/${project.id}`)}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-lg tracking-tight truncate group-hover:text-primary transition-colors">{project.company_name}</h4>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-60">{project.industry}</p>
+                          </div>
+                          <UIStatusBadge status={project.status} />
+                        </div>
+                        
+                        <div className="space-y-2 mt-auto">
+                          <div className="flex justify-between text-[10px] font-bold text-muted-foreground tracking-tight uppercase">
+                            <span>Diagnostic Score</span>
+                            <span className="text-primary font-black">{project.status === 'completed' ? '84/100' : 'In Progress'}</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div 
+                              className={cn(
+                                "h-full rounded-full transition-all duration-1000 ease-out",
+                                project.status === 'completed' ? "bg-primary" : "bg-primary/40 animate-pulse"
+                              )}
+                              style={{ width: project.status === 'completed' ? '84%' : '45%' }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 blur-[40px] rounded-full -mr-12 -mt-12 group-hover:bg-primary/10 transition-colors" />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-20 text-center space-y-6">
+                      <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-[2rem] flex items-center justify-center mx-auto rotate-6">
+                        <Briefcase className="w-8 h-8 text-muted-foreground opacity-20" />
+                      </div>
+                      <div className="space-y-1 px-4">
+                        <p className="font-bold">No active projects</p>
+                        <p className="text-xs text-muted-foreground font-medium italic">Start a diagnostic to see your first growth report</p>
+                      </div>
+                      <Button variant="outline" size="sm" className="rounded-xl font-bold px-6 border-zinc-200 dark:border-zinc-800" onClick={() => navigate('/projects/new')}>
+                        Create Project
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              ))}</div>
+              </ScrollArea>
+              {projects?.length > 10 && (
+                <div className="px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50">
+                  <Button variant="ghost" className="w-full rounded-2xl font-bold text-xs text-muted-foreground hover:text-primary" onClick={() => navigate('/projects')}>
+                    See all {projects.length} projects
+                  </Button>
+                </div>
+              )}
             </CardContent>
-          </Card>
-        )}
+          </GlassCard>
+
+          <GlassCard className="p-6 bg-zinc-900 text-white border-none shadow-2xl">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+                <Settings className="w-6 h-6 text-white stroke-[2.5px]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold uppercase tracking-widest opacity-60">System Health</p>
+                <p className="font-bold tracking-tight">Optimal Performance</p>
+              </div>
+              <ArrowUpRight className="w-5 h-5 opacity-40" />
+            </div>
+          </GlassCard>
+        </div>
       </div>
     </div>
   )
@@ -595,7 +867,7 @@ function DashboardPage() {
 function ProjectsListPage() {
   const { navigate, profile } = useAuth()
   const queryClient = useQueryClient()
-  const { data: projects, isLoading } = useQuery({ queryKey: ['projects'], queryFn: () => apiFetch('/projects') })
+  const { data: projects, isLoading: projectsLoading } = useQuery({ queryKey: ['projects'], queryFn: () => apiFetch('/projects') })
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
@@ -608,51 +880,164 @@ function ProjectsListPage() {
     })
   }, [projects, search, statusFilter])
 
-  if (isLoading) return <PageSkeleton />
+  const stats = useMemo(() => {
+    if (!projects) return { total: 0, active: 0, completed: 0 }
+    return {
+      total: projects.length,
+      active: projects.filter(p => p.status === 'active' || p.status === 'in_progress').length,
+      completed: projects.filter(p => p.status === 'completed').length
+    }
+  }, [projects])
+
+  if (projectsLoading) return <UIPageSkeleton />
+
+  const isAdmin = profile?.role === 'admin'
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div><h1 className="text-3xl font-bold tracking-tight">Projects</h1><p className="text-muted-foreground mt-1">{projects?.length || 0} total projects</p></div>
-        <Button onClick={() => navigate('/projects/new')} className="shadow-md"><Plus className="w-4 h-4 mr-2" />New Project</Button>
+    <div className="relative space-y-8 bg-transparent px-2">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      
+      {/* Header Section */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+            <Briefcase className="w-3 h-3" />
+            Project Management
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Organization <span className="text-primary">Portfolio</span>
+          </h1>
+          <p className="text-muted-foreground font-medium max-w-xl">
+            Manage your diagnostic pipeline and access deep revenue insights across all active accounts.
+          </p>
+        </div>
+        
+        <Button className="rounded-2xl shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all font-semibold px-6 h-11" onClick={() => navigate('/projects/new')}>
+          <Plus className="w-4 h-4 mr-2" />
+          Create New Project
+        </Button>
+      </header>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <StatCard label="Total Portfolio" value={stats.total} icon={FolderKanban} color="text-primary" trend={5} />
+        <StatCard label="Active Diagnostics" value={stats.active} icon={ActivityIcon} color="text-blue-500" trend={2} />
+        <StatCard label="Completed Reports" value={stats.completed} icon={CheckCircle2} color="text-emerald-500" trend={8} />
       </div>
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Search projects..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" /></div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger><SelectContent>
-          <SelectItem value="all">All Status</SelectItem><SelectItem value="draft">Draft</SelectItem><SelectItem value="in_progress">In Progress</SelectItem><SelectItem value="completed">Completed</SelectItem><SelectItem value="archived">Archived</SelectItem>
-        </SelectContent></Select>
-      </div>
-      {filtered.length === 0 ? (
-        <Card className="border-2 border-dashed"><CardContent className="py-16 text-center">
-          <FolderKanban className="w-16 h-16 mx-auto text-muted-foreground/20 mb-4" />
-          <h3 className="text-lg font-semibold">No projects found</h3>
-          <p className="text-muted-foreground mt-1">{projects?.length === 0 ? 'Create your first project to get started' : 'Try adjusting your filters'}</p>
-          {projects?.length === 0 && <Button className="mt-4" onClick={() => navigate('/projects/new')}><Plus className="w-4 h-4 mr-2" />Create Project</Button>}
-        </CardContent></Card>
+
+      {/* Filter Bar */}
+      <GlassCard className="p-4 md:p-6 shadow-sm border-zinc-200/50 dark:border-zinc-800/50">
+        <div className="flex flex-col lg:flex-row gap-4 items-center">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground opacity-50" />
+            <Input 
+              placeholder="Search by company or industry..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-11 h-12 bg-white/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 rounded-2xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+            />
+          </div>
+          <div className="flex gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-2 bg-white/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 h-12 shrink-0">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="border-none bg-transparent focus:ring-0 h-auto p-0 min-w-[120px] font-semibold text-sm">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800">
+                  <SelectItem value="all">All Pipeline</SelectItem>
+                  <SelectItem value="draft">Drafts</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* Projects Grid */}
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filtered.map((project, i) => (
+            <div 
+              key={project.id}
+              className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <GlassCard 
+                className="group flex flex-col p-7 border-zinc-200/50 dark:border-zinc-800/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-500 cursor-pointer relative overflow-hidden h-full"
+                onClick={() => navigate(`/projects/${project.id}`)}
+              >
+                <div className="flex items-start justify-between mb-6">
+                  <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center group-hover:scale-110 group-hover:bg-primary/10 group-hover:text-primary transition-all duration-500 shadow-sm border border-zinc-200/50 dark:border-zinc-800/50">
+                    <Building2 className="w-7 h-7 stroke-[1.5px]" />
+                  </div>
+                  <UIStatusBadge status={project.status} className="shadow-sm" />
+                </div>
+
+                <div className="space-y-1 mb-8 flex-1">
+                  <h3 className="text-xl font-bold tracking-tight group-hover:text-primary transition-colors line-clamp-1">{project.company_name}</h3>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] opacity-60">{project.industry}</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground tracking-tight uppercase">
+                      <span>Diagnostic Progress</span>
+                      <span className="text-primary font-black">{project.status === 'completed' ? '100%' : '45%'}</span>
+                    </div>
+                    <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-200/20 dark:border-zinc-800/20">
+                      <div 
+                        className={cn(
+                          "h-full rounded-full transition-all duration-1000 ease-out",
+                          project.status === 'completed' ? "bg-emerald-500" : "bg-primary animate-pulse shadow-[0_0_10px_rgba(var(--primary),0.3)]"
+                        )}
+                        style={{ width: project.status === 'completed' ? '100%' : '45%' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/50 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex -space-x-2">
+                        {[1, 2].map((_, i) => (
+                          <Avatar key={i} className="w-6 h-6 border-2 border-background shadow-sm">
+                            <AvatarFallback className="bg-primary/10 text-[8px] font-bold text-primary">C{i+1}</AvatarFallback>
+                          </Avatar>
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-semibold text-muted-foreground">{project.consultant?.name || 'Assigned'}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground/60 uppercase">
+                      <Clock className="w-3 h-3" />
+                      {new Date(project.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subtle Hover Decoration */}
+                <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-primary/5 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+              </GlassCard>
+            </div>
+          ))}
+        </div>
       ) : (
-        <div className="grid gap-3">{filtered.map(project => (
-          <Card key={project.id} className="border hover:border-primary/30 hover:shadow-md transition-all duration-200 cursor-pointer group" onClick={() => navigate(`/projects/${project.id}`)}>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-4 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                    <Building2 className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold truncate group-hover:text-primary transition-colors">{project.company_name}</h3>
-                    <p className="text-sm text-muted-foreground">{project.industry}</p>
-                    {profile?.role === 'admin' && project.consultant && <p className="text-xs text-muted-foreground mt-1">Consultant: {project.consultant.name}</p>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 sm:shrink-0">
-                  <StatusBadge status={project.status} />
-                  <span className="text-xs text-muted-foreground hidden sm:block">{new Date(project.created_at).toLocaleDateString()}</span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}</div>
+        <GlassCard className="py-24 flex flex-col items-center justify-center text-center space-y-6">
+          <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-800/50 rounded-[2.5rem] flex items-center justify-center border border-zinc-200 dark:border-zinc-800 shadow-inner rotate-6">
+            <Search className="w-10 h-10 text-muted-foreground opacity-20" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-2xl font-bold tracking-tight">No projects found</h3>
+            <p className="text-muted-foreground max-w-xs mx-auto font-medium">
+              Try adjusting your search filters or create a new project to start a diagnostic.
+            </p>
+          </div>
+          <Button variant="outline" className="rounded-2xl font-bold px-8 border-zinc-200 dark:border-zinc-800" onClick={() => { setSearch(''); setStatusFilter('all'); }}>
+            Reset All Filters
+          </Button>
+        </GlassCard>
       )}
     </div>
   )
@@ -719,8 +1104,8 @@ function ProjectDetailPage({ id }) {
   const [showArchive, setShowArchive] = useState(false)
   const [linkLoading, setLinkLoading] = useState(false)
 
-  if (isLoading) return <PageSkeleton />
-  if (!project) return <div className="text-center py-20"><p className="text-muted-foreground">Project not found</p></div>
+  if (isLoading) return <UIPageSkeleton />
+  if (!project) return <div className="text-center py-24"><GlassCard className="p-12 max-w-md mx-auto"><AlertTriangle className="w-12 h-12 text-muted-foreground opacity-20 mx-auto mb-4" /><p className="text-muted-foreground font-medium">Project intelligence not found</p><Button variant="ghost" className="mt-4" onClick={() => navigate('/projects')}>Return to Portfolio</Button></GlassCard></div>
 
   const assessment = project.latest_assessment
   const screenerStatus = assessment?.screener_status || 'not_started'
@@ -739,7 +1124,7 @@ function ProjectDetailPage({ id }) {
   async function generateLink() {
     setLinkLoading(true)
     try {
-      const link = await apiFetch(`/projects/${id}/link`, { method: 'POST' })
+      await apiFetch(`/projects/${id}/link`, { method: 'POST' })
       queryClient.invalidateQueries({ queryKey: ['project', id] })
       toast.success('Questionnaire link generated!')
     } catch (err) { toast.error(err.message) } finally { setLinkLoading(false) }
@@ -755,127 +1140,250 @@ function ProjectDetailPage({ id }) {
     try {
       await apiFetch(`/projects/${id}/reassess`, { method: 'POST' })
       queryClient.invalidateQueries({ queryKey: ['project', id] })
-      toast.success('New assessment started')
+      toast.success('New assessment cycle initiated')
     } catch (err) { toast.error(err.message) }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <button onClick={() => navigate('/projects')} className="hover:text-foreground transition-colors">Projects</button>
-        <ChevronRight className="w-4 h-4" /><span className="text-foreground font-medium">{project.company_name}</span>
+    <div className="relative space-y-8 bg-transparent px-2">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      
+      <div className="flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase text-muted-foreground/60">
+        <button onClick={() => navigate('/projects')} className="hover:text-primary hover:underline cursor-pointer transition-colors">Portfolio</button>
+        <ChevronRight className="w-3 h-3" />
+        <span className="text-primary">{project.company_name}</span>
       </div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center"><Building2 className="w-7 h-7 text-primary" /></div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{project.company_name}</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <Badge variant="secondary">{project.industry}</Badge>
-              <StatusBadge status={project.status} />
-              {project.consultant && <span className="text-sm text-muted-foreground">Consultant: {project.consultant.name}</span>}
+
+      {/* Executive Header */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="flex items-start gap-6">
+          <div className="w-20 h-20 rounded-[2rem] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl flex items-center justify-center shrink-0">
+            <Building2 className="w-10 h-10 text-primary stroke-[1.5px]" />
+          </div>
+          <div className="space-y-1.5">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">{project.company_name}</h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider">{project.industry}</Badge>
+              <UIStatusBadge status={project.status} />
+              {project.consultant && (
+                <div className="flex items-center gap-2 px-3 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-full">
+                  <Avatar className="w-4 h-4">
+                    <AvatarFallback className="text-[8px] font-black">{project.consultant.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">{project.consultant.name}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          {diagnosticStatus === 'completed' && <Button variant="outline" onClick={startReassessment}><RefreshCw className="w-4 h-4 mr-2" />Reassess</Button>}
-          {profile?.role === 'admin' && <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setShowArchive(true)}><Trash2 className="w-4 h-4" /></Button>}
+        <div className="flex gap-3">
+          {diagnosticStatus === 'completed' && (
+            <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-11" onClick={startReassessment}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              New Assessment
+            </Button>
+          )}
+          {profile?.role === 'admin' && (
+            <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 text-destructive hover:bg-destructive/10 h-11" onClick={() => setShowArchive(true)}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Archive
+            </Button>
+          )}
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="xl:col-span-2 space-y-8">
+          {/* Diagnostic Progress Steps */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { id: 'screener', title: 'Screener', status: screenerStatus, icon: FileText, desc: 'Company Context', path: `/projects/${id}/screener`, active: true },
+              { id: 'diagnostic', title: 'Diagnostic', status: diagnosticStatus, icon: BarChart3, desc: 'Growth Pillars', path: `/projects/${id}/diagnostic`, active: screenerStatus === 'completed' },
+              { id: 'scores', title: 'Intelligence', status: scores ? 'completed' : 'not_started', icon: Zap, desc: 'Deep Insights', path: `/projects/${id}/scores`, active: !!scores },
+            ].map((step, i) => (
+              <GlassCard 
+                key={step.id}
+                className={cn(
+                  "group p-6 cursor-pointer border-zinc-200/50 dark:border-zinc-800/50 hover:bg-primary/5 transition-all duration-500",
+                  !step.active && "opacity-50 grayscale cursor-not-allowed hover:bg-transparent"
+                )}
+                onClick={() => step.active && navigate(step.path)}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-sm border",
+                    step.status === 'completed' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-primary/10 border-primary/20 text-primary"
+                  )}>
+                    <step.icon className="w-6 h-6 stroke-[2px]" />
+                  </div>
+                  <UIStatusBadge status={step.status} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-lg tracking-tight group-hover:text-primary transition-colors">{step.title}</h3>
+                  <p className="text-xs text-muted-foreground font-medium">{step.desc}</p>
+                </div>
+                <Button variant="ghost" className="w-full mt-6 rounded-xl font-bold text-xs group-hover:bg-primary group-hover:text-white transition-all duration-500" disabled={!step.active}>
+                  {step.status === 'completed' ? 'Review Phase' : 'Continue Phase'}
+                  <ChevronRight className="w-3 h-3 ml-2" />
+                </Button>
+              </GlassCard>
+            ))}
+          </div>
+
+          {/* Scores Executive Summary */}
+          {scores && (
+            <GlassCard className="p-10 bg-gradient-to-br from-primary/10 via-transparent to-blue-500/5 border-primary/10 relative overflow-hidden">
+              <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
+                <div className="text-center space-y-2">
+                  <div className="relative inline-block">
+                    <svg className="w-40 h-40 transform -rotate-90">
+                      <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-zinc-200 dark:text-zinc-800" />
+                      <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={440} strokeDashoffset={440 - (440 * scores.radScore) / 100} className="text-primary" strokeLinecap="round" />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-5xl font-black tracking-tighter text-primary">{scores.radScore}</span>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">RAD Score</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex-1 space-y-6 text-center md:text-left">
+                  <div className="space-y-2">
+                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", scores.maturityBand?.includes('Strong') ? 'bg-emerald-500' : 'bg-amber-500')}>
+                      {scores.maturityBand?.toUpperCase()}
+                    </Badge>
+                    <h2 className="text-3xl font-bold tracking-tight">Executive Summary Available</h2>
+                    <p className="text-muted-foreground font-medium leading-relaxed">
+                      The diagnostic phase is complete. We've identified <span className="text-destructive font-bold">{scores.primaryConstraint?.name}</span> as the primary constraint holding back revenue growth.
+                    </p>
+                  </div>
+                  <Button size="lg" className="rounded-2xl font-black px-10 h-14 shadow-2xl shadow-primary/20" onClick={() => navigate(`/projects/${id}/scores`)}>
+                    VIEW FULL INTELLIGENCE REPORT
+                    <ArrowUpRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-primary/10 blur-[100px] rounded-full pointer-events-none" />
+            </GlassCard>
+          )}
+
+          {/* Questionnaire Access */}
+          <GlassCard className="p-8">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                    <Link2 className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-xl font-bold tracking-tight">Client Access Terminal</h3>
+                </div>
+                <p className="text-muted-foreground font-medium">Share this unique, secure entry point with the organization's executive team.</p>
+              </div>
+              
+              <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
+                {project.questionnaire_link && project.questionnaire_link.status === 'active' ? (
+                  <>
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-primary/20 blur-[20px] rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Input readOnly value={`${window.location.origin}#/assess/${project.questionnaire_link.token}`} className="relative bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-2xl font-mono text-xs h-12 w-full sm:w-[280px] pr-10" />
+                      <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-10 w-10 text-primary" onClick={copyLink}>
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 h-12 font-bold px-6" onClick={() => window.open(`#/assess/${project.questionnaire_link.token}`, '_blank')}>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open Link
+                    </Button>
+                  </>
+                ) : (
+                  <Button className="rounded-2xl h-12 font-bold px-8 shadow-xl shadow-primary/20" onClick={generateLink} disabled={linkLoading}>
+                    {linkLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                    Generate Secure Access Link
+                  </Button>
+                )}
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+
+        {/* Sidebar Intelligence */}
+        <div className="space-y-8">
+          {/* Assessment History */}
+          <GlassCard className="flex flex-col h-full min-h-[500px]">
+            <CardHeader className="pb-6">
+              <div className="flex items-center justify-between mb-1">
+                <CardTitle className="text-xl font-bold tracking-tight">History</CardTitle>
+                <Clock className="w-4 h-4 text-muted-foreground opacity-40" />
+              </div>
+              <CardDescription className="text-xs">Timeline of diagnostic assessments</CardDescription>
+            </CardHeader>
+            <CardContent className="px-6 flex-1 overflow-auto">
+              <div className="space-y-6">
+                {project.assessments?.map((a, i) => (
+                  <div key={a.id} className="relative group pl-8 pb-6 last:pb-0">
+                    {/* Timeline Line */}
+                    {i !== project.assessments.length - 1 && <div className="absolute left-[11px] top-6 bottom-0 w-0.5 bg-zinc-100 dark:bg-zinc-800" />}
+                    <div className={cn(
+                      "absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-white dark:border-zinc-950 flex items-center justify-center z-10 shadow-sm transition-transform group-hover:scale-110",
+                      a.diagnostic_status === 'completed' ? "bg-emerald-500" : "bg-primary"
+                    )} />
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Cycle #{a.assessment_number}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground">{a.completed_at ? new Date(a.completed_at).toLocaleDateString() : 'Active'}</span>
+                      </div>
+                      <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 group-hover:border-primary/20 transition-all duration-500">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-bold tracking-tight">{a.diagnostic_status === 'completed' ? 'Finalized' : 'In Progress'}</p>
+                          {a.scores?.radScore && <span className="text-lg font-black text-primary">{a.scores.radScore}</span>}
+                        </div>
+                        <UIStatusBadge status={a.diagnostic_status} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </GlassCard>
+
+          {/* Quick Stats Sidebar Card */}
+          <GlassCard className="p-6 bg-zinc-900 text-white border-none shadow-2xl">
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
+                  <Shield className="w-6 h-6 text-white stroke-[2.5px]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-widest opacity-60">Compliance</p>
+                  <p className="font-bold tracking-tight">Security Verified</p>
+                </div>
+              </div>
+              <p className="text-xs font-medium opacity-60 leading-relaxed">
+                All assessment data is encrypted and isolated within your organization container.
+              </p>
+            </div>
+          </GlassCard>
         </div>
       </div>
-      {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className={`border-2 ${CARD_COLORS[0]}`}>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm text-white dark:text-foreground">Screener</h3><StatusBadge status={screenerStatus} /></div>
-            <p className="text-xs text-white/70 dark:text-muted-foreground mb-3">20 questions about company context</p>
-            <Button size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 dark:bg-background dark:text-foreground dark:border-border dark:hover:bg-muted" variant="outline" onClick={() => navigate(`/projects/${id}/screener`)}>
-              {screenerStatus === 'not_started' ? 'Start Screener' : screenerStatus === 'in_progress' ? 'Continue Screener' : 'View Responses'}
-            </Button>
-          </CardContent>
-        </Card>
-        <Card className={`border-2 ${CARD_COLORS[1]}`}>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm text-white dark:text-foreground">Diagnostic</h3><StatusBadge status={diagnosticStatus} /></div>
-            <p className="text-xs text-white/70 dark:text-muted-foreground mb-3">7 pillars of growth readiness</p>
-            <Button size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 dark:bg-background dark:text-foreground dark:border-border dark:hover:bg-muted" variant="outline"
-              disabled={screenerStatus !== 'completed'}
-              onClick={() => navigate(`/projects/${id}/diagnostic`)}>
-              {screenerStatus !== 'completed' ? 'Complete Screener First' : diagnosticStatus === 'not_started' ? 'Start Diagnostic' : diagnosticStatus === 'in_progress' ? 'Continue Diagnostic' : 'View Responses'}
-            </Button>
-          </CardContent>
-        </Card>
-        <Card className={`border-2 ${CARD_COLORS[2]}`}>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm text-white dark:text-foreground">Scores & Report</h3>{scores ? <StatusBadge status="completed" /> : <StatusBadge status="not_started" />}</div>
-            <p className="text-xs text-white/70 dark:text-muted-foreground mb-3">{scores ? `RAD Score: ${scores.radScore}` : 'Complete diagnostic to view'}</p>
-            <Button size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30 dark:bg-background dark:text-foreground dark:border-border dark:hover:bg-muted" variant="outline" disabled={!scores} onClick={() => navigate(`/projects/${id}/scores`)}>
-              {scores ? 'View Scores' : 'Not Available Yet'}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-      {/* Scores Summary */}
-      {scores && (
-        <Card className="border-2 bg-gradient-to-r from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-6">
-                <div className="text-center">
-                  <p className="text-5xl font-bold text-primary">{scores.radScore}</p>
-                  <p className="text-xs text-muted-foreground mt-1">RAD Score</p>
-                </div>
-                <Separator orientation="vertical" className="h-16 hidden sm:block" />
-                <div>
-                  <Badge className={`text-sm px-3 py-1 ${scores.maturityBand?.includes('Strong') ? 'bg-green-500' : scores.maturityBand?.includes('Developing') ? 'bg-amber-500' : scores.maturityBand?.includes('Fragile') ? 'bg-orange-500' : 'bg-red-500'} text-white`}>{scores.maturityBand}</Badge>
-                  {scores.primaryConstraint && <p className="text-sm text-muted-foreground mt-2">Primary Constraint: <span className="text-destructive font-medium">{scores.primaryConstraint.name}</span></p>}
-                </div>
-              </div>
-              <Button onClick={() => navigate(`/projects/${id}/scores`)}><TrendingUp className="w-4 h-4 mr-2" />View Full Report</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      {/* Questionnaire Link */}
-      <Card className="border-2">
-        <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><Link2 className="w-5 h-5 text-primary" />Questionnaire Link</CardTitle><CardDescription>Share with client for self-service assessment</CardDescription></CardHeader>
-        <CardContent>
-          {project.questionnaire_link && project.questionnaire_link.status === 'active' ? (
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Input readOnly value={project.questionnaire_link.url || `${window.location.origin}#/assess/${project.questionnaire_link.token}`} className="flex-1 font-mono text-sm" />
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={copyLink}><Copy className="w-4 h-4 mr-2" />Copy</Button>
-                <Button variant="outline" onClick={generateLink} disabled={linkLoading}><RefreshCw className="w-4 h-4 mr-2" />Regenerate</Button>
-              </div>
-            </div>
-          ) : (
-            <Button onClick={generateLink} disabled={linkLoading}>{linkLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</> : <><Link2 className="w-4 h-4 mr-2" />Generate Link</>}</Button>
-          )}
-        </CardContent>
-      </Card>
-      {/* Reassessment History */}
-      {project.assessments?.length > 1 && (
-        <Card className="border-2">
-          <CardHeader className="pb-3"><CardTitle className="text-lg">Assessment History</CardTitle></CardHeader>
-          <CardContent>
-            <Table><TableHeader><TableRow><TableHead>#</TableHead><TableHead>Date</TableHead><TableHead>RAD Score</TableHead><TableHead>Maturity</TableHead><TableHead>Constraint</TableHead></TableRow></TableHeader>
-              <TableBody>{project.assessments.map(a => (
-                <TableRow key={a.id}><TableCell className="font-medium">#{a.assessment_number}</TableCell>
-                  <TableCell>{a.completed_at ? new Date(a.completed_at).toLocaleDateString() : '-'}</TableCell>
-                  <TableCell className="font-bold">{a.scores?.radScore || '-'}</TableCell>
-                  <TableCell>{a.scores?.maturityBand || '-'}</TableCell>
-                  <TableCell>{a.scores?.primaryConstraint?.name || '-'}</TableCell>
-                </TableRow>
-              ))}</TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+
       {/* Archive dialog */}
-      <Dialog open={showArchive} onOpenChange={setShowArchive}><DialogContent>
-        <DialogHeader><DialogTitle>Archive Project?</DialogTitle><DialogDescription>This will archive &quot;{project.company_name}&quot;. You can unarchive it later.</DialogDescription></DialogHeader>
-        <DialogFooter><Button variant="outline" onClick={() => setShowArchive(false)}>Cancel</Button><Button variant="destructive" onClick={handleArchive}>Archive</Button></DialogFooter>
-      </DialogContent></Dialog>
+      <Dialog open={showArchive} onOpenChange={setShowArchive}>
+        <DialogContent className="rounded-[2rem] border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tight">Archive Project Portfolio?</DialogTitle>
+            <DialogDescription className="text-base font-medium">
+              This action will securely archive "{project.company_name}" from your active portfolio. Intelligence reports will remain accessible via the archive vault.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-3 mt-6">
+            <Button variant="outline" className="rounded-xl border-zinc-200 dark:border-zinc-800 font-bold px-6 h-11" onClick={() => setShowArchive(false)}>Cancel Action</Button>
+            <Button variant="destructive" className="rounded-xl font-bold px-8 h-11 shadow-lg shadow-destructive/20" onClick={handleArchive}>Archive Now</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -1044,7 +1552,7 @@ function OrganizationSettingsPage() {
             </div>
             <div className="p-4 rounded-xl bg-muted/50 text-center col-span-2">
               <p className="text-sm font-medium mb-2">Features Included</p>
-              <div className="flex flex-wrap gap-1 justify-center">
+              <div className="flex wrap gap-1 justify-center">
                 {(planFeatures[org.plan] || []).map((f, i) => (
                   <Badge key={i} variant="outline" className="text-xs">{f}</Badge>
                 ))}
@@ -1069,15 +1577,15 @@ function OrganizationSettingsPage() {
                   <div className="flex items-center gap-3">
                     <Input 
                       type="color" 
-                      value={settings.branding?.primary_color || '#f97316'} 
+                      value={settings.branding?.primary_color || '#000000'} 
                       onChange={e => setSettings({...settings, branding: {...settings.branding, primary_color: e.target.value}})}
                       className="w-16 h-10 p-1 cursor-pointer"
                     />
                     <Input 
-                      value={settings.branding?.primary_color || '#f97316'} 
+                      value={settings.branding?.primary_color || '#000000'} 
                       onChange={e => setSettings({...settings, branding: {...settings.branding, primary_color: e.target.value}})}
                       className="font-mono"
-                      placeholder="#f97316"
+                      placeholder="#000000"
                     />
                   </div>
                 </div>
@@ -1162,68 +1670,212 @@ function ScreenerPage({ id }) {
   async function handleSubmit() {
     await apiFetch(`/projects/${id}/screener`, { method: 'PUT', body: { responses } })
     await apiFetch(`/projects/${id}/screener/submit`, { method: 'POST' })
-    toast.success('Screener completed!')
+    toast.success('Strategic context captured successfully')
     navigate(`/projects/${id}`)
   }
 
-  if (!loaded) return <PageSkeleton />
+  if (!loaded) return <UIPageSkeleton />
   const section = SCREENER_SECTIONS[currentSection]
   const progress = ((currentSection + 1) / SCREENER_SECTIONS.length) * 100
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="relative space-y-8 bg-transparent px-2 max-w-4xl mx-auto pb-20">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => navigate(`/projects/${id}`)}><ArrowLeft className="w-4 h-4 mr-2" />Back to Project</Button>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">{saving ? <><Loader2 className="w-3 h-3 animate-spin" />Saving...</> : saved ? <><CheckCircle2 className="w-3 h-3 text-green-500" />Saved</> : null}</div>
-      </div>
-      <div><h1 className="text-2xl font-bold">Screener Questionnaire</h1><p className="text-muted-foreground mt-1">Section {currentSection + 1} of {SCREENER_SECTIONS.length}: {section.title}</p></div>
-      <Progress value={progress} className="h-2" />
-      <Card className="border-2"><CardContent className="p-6 space-y-6">
-        {section.questions.map(q => (
-          <div key={q.id} className="space-y-2">
-            <Label className="text-base font-medium">{q.label} {q.required && <span className="text-destructive">*</span>}</Label>
-            {q.type === 'text' && <Input value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} />}
-            {q.type === 'email' && <Input type="email" value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} />}
-            {q.type === 'textarea' && <Textarea value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} placeholder={q.placeholder || ''} rows={3} />}
-            {q.type === 'radio' && (
-              <RadioGroup value={responses[q.id] || ''} onValueChange={v => updateResponse(q.id, v)}>
-                {q.options.map(opt => <div key={opt} className="flex items-center space-x-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors"><RadioGroupItem value={opt} id={`${q.id}-${opt}`} /><Label htmlFor={`${q.id}-${opt}`} className="flex-1 cursor-pointer text-sm">{opt}</Label></div>)}
-              </RadioGroup>
+        <div className="flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase text-muted-foreground/60">
+          <button onClick={() => navigate('/projects')} className="hover:text-primary hover:underline cursor-pointer transition-colors">Portfolio</button>
+          <ChevronRight className="w-3 h-3" />
+          <button onClick={() => navigate(`/projects/${id}`)} className="hover:text-primary hover:underline cursor-pointer transition-colors">Project</button>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-primary font-black">Screener</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md rounded-full border border-zinc-200 dark:border-zinc-800 shadow-sm transition-all duration-500">
+            {saving ? (
+              <><Loader2 className="w-3.5 h-3.5 text-primary animate-spin" /><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Syncing Intelligence...</span></>
+            ) : saved ? (
+              <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Intelligence Secured</span></>
+            ) : (
+              <><Clock className="w-3.5 h-3.5 text-muted-foreground/40" /><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Draft Auto-Saving</span></>
             )}
-            {q.type === 'select' && (
-              <Select value={responses[q.id] || ''} onValueChange={v => updateResponse(q.id, v)}><SelectTrigger><SelectValue placeholder={`Select ${q.label.toLowerCase()}`} /></SelectTrigger>
-                <SelectContent><ScrollArea className="h-[250px]">{(q.options === 'INDUSTRIES' ? INDUSTRIES : q.options === 'MONTHS' ? MONTHS : (q.options || [])).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</ScrollArea></SelectContent>
-              </Select>
-            )}
-            {q.type === 'checkbox' && (
-              <div className="space-y-2">{q.options.map(opt => (
-                <div key={opt} className="flex items-center space-x-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                  <Checkbox id={`${q.id}-${opt}`} checked={(responses[q.id] || []).includes(opt)} onCheckedChange={checked => {
-                    const current = responses[q.id] || []
-                    updateResponse(q.id, checked ? [...current, opt] : current.filter(v => v !== opt))
-                  }} /><Label htmlFor={`${q.id}-${opt}`} className="flex-1 cursor-pointer text-sm">{opt}</Label>
-                </div>
-              ))}</div>
-            )}
-            {q.type === 'multiselect' && (
-              <Input value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} placeholder="Enter countries separated by commas" />
-            )}
-            {q.type === 'currency' && (
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                <Input type="text" value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value.replace(/[^\d.,]/g, ''))} placeholder={q.placeholder} className="pl-7" />
-              </div>
-            )}
-            {q.note && <p className="text-xs text-muted-foreground italic">{q.note}</p>}
           </div>
-        ))}
-      </CardContent></Card>
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={() => setCurrentSection(Math.max(0, currentSection - 1))} disabled={currentSection === 0}><ChevronLeft className="w-4 h-4 mr-1" />Back</Button>
-        {currentSection < SCREENER_SECTIONS.length - 1 ? (
-          <Button onClick={() => setCurrentSection(currentSection + 1)}>Next<ChevronRight className="w-4 h-4 ml-1" /></Button>
-        ) : (
-          <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="w-4 h-4 mr-2" />Complete Screener</Button>
-        )}
+        </div>
+      </div>
+
+      <header className="space-y-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+            <FileText className="w-3 h-3" />
+            Phase 01: Strategic Screener
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Capture <span className="text-primary">Business Context</span></h1>
+          <p className="text-muted-foreground font-medium max-w-2xl leading-relaxed">
+            Please provide accurate details about the organization&apos;s current operations to prime the RAD™ engine for deeper diagnostic analysis.
+          </p>
+        </div>
+
+        <div className="pt-4 space-y-3">
+          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <span>Overall Progress</span>
+            <span className="text-primary">{Math.round(progress)}% Complete</span>
+          </div>
+          <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
+            <div className="h-full bg-primary rounded-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(var(--primary),0.4)]" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="flex gap-1 pt-2 overflow-x-auto no-scrollbar">
+            {SCREENER_SECTIONS.map((s, i) => (
+              <div 
+                key={i} 
+                className={cn(
+                  "h-1 flex-1 min-w-[40px] rounded-full transition-all duration-500",
+                  i < currentSection ? "bg-emerald-500" : i === currentSection ? "bg-primary shadow-[0_0_8px_rgba(var(--primary),0.5)]" : "bg-zinc-200 dark:bg-zinc-800"
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 gap-8">
+        <GlassCard className="p-0 border-zinc-200/50 dark:border-zinc-800/50 shadow-xl overflow-visible">
+          <CardHeader className="p-8 pb-4">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black text-sm">
+                {String(currentSection + 1).padStart(2, '0')}
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-bold tracking-tight">{section.title}</CardTitle>
+                <CardDescription className="font-medium">Section {currentSection + 1} of {SCREENER_SECTIONS.length}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="p-8 pt-4 space-y-10">
+            {section.questions.map((q, idx) => (
+              <div key={q.id} className="space-y-4 group animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                <div className="space-y-1.5">
+                  <Label className="text-base font-bold tracking-tight text-zinc-800 dark:text-zinc-200 flex items-start gap-2 leading-relaxed">
+                    {q.label} {q.required && <span className="text-primary font-black text-lg leading-none -mt-1">*</span>}
+                  </Label>
+                  {q.note && <p className="text-xs text-muted-foreground font-medium italic opacity-70 ml-0 leading-relaxed">{q.note}</p>}
+                </div>
+
+                <div className="relative">
+                  {q.type === 'text' && <Input value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} className="h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm" />}
+                  {q.type === 'email' && <Input type="email" value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} className="h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm" />}
+                  {q.type === 'textarea' && <Textarea value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} placeholder={q.placeholder || 'Type here...'} rows={4} className="bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm resize-none" />}
+                  
+                  {q.type === 'radio' && (
+                    <RadioGroup value={responses[q.id] || ''} onValueChange={v => updateResponse(q.id, v)} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {q.options.map(opt => (
+                        <div key={opt} className={cn(
+                          "flex items-center space-x-3 p-4 rounded-2xl border transition-all duration-300 cursor-pointer shadow-sm group/radio",
+                          responses[q.id] === opt ? "bg-primary/5 border-primary shadow-primary/5" : "bg-white/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 hover:border-primary/30"
+                        )} onClick={() => updateResponse(q.id, opt)}>
+                          <RadioGroupItem value={opt} id={`${q.id}-${opt}`} className="border-zinc-300 dark:border-zinc-700" />
+                          <Label htmlFor={`${q.id}-${opt}`} className="flex-1 cursor-pointer text-sm font-semibold tracking-tight">{opt}</Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  )}
+
+                  {q.type === 'select' && (
+                    <Select value={responses[q.id] || ''} onValueChange={v => updateResponse(q.id, v)}>
+                      <SelectTrigger className="h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-primary/20 focus:border-primary transition-all duration-300 shadow-sm font-semibold">
+                        <SelectValue placeholder={`Select ${q.label.toLowerCase()}`} />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800 p-1">
+                        <ScrollArea className="h-[250px]">
+                          {(q.options === 'INDUSTRIES' ? INDUSTRIES : q.options === 'MONTHS' ? MONTHS : (q.options || [])).map(opt => (
+                            <SelectItem key={opt} value={opt} className="rounded-xl font-medium focus:bg-primary/10 focus:text-primary transition-colors">{opt}</SelectItem>
+                          ))}
+                        </ScrollArea>
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {q.type === 'checkbox' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {q.options.map(opt => (
+                        <div key={opt} className={cn(
+                          "flex items-center space-x-3 p-4 rounded-2xl border transition-all duration-300 cursor-pointer shadow-sm group/check",
+                          (responses[q.id] || []).includes(opt) ? "bg-primary/5 border-primary shadow-primary/5" : "bg-white/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 hover:border-primary/30"
+                        )} onClick={() => {
+                          const current = responses[q.id] || []
+                          const newVal = current.includes(opt) ? current.filter(v => v !== opt) : [...current, opt]
+                          updateResponse(q.id, newVal)
+                        }}>
+                          <Checkbox id={`${q.id}-${opt}`} checked={(responses[q.id] || []).includes(opt)} className="rounded-md border-zinc-300 dark:border-zinc-700" />
+                          <Label htmlFor={`${q.id}-${opt}`} className="flex-1 cursor-pointer text-sm font-semibold tracking-tight">{opt}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {q.type === 'multiselect' && (
+                    <Input 
+                      value={responses[q.id] || ''} 
+                      onChange={e => updateResponse(q.id, e.target.value)} 
+                      placeholder="Enter details separated by commas..." 
+                      className="h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm"
+                    />
+                  )}
+
+                  {q.type === 'currency' && (
+                    <div className="relative group/currency">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-primary opacity-40 group-focus-within/currency:opacity-100 transition-opacity">$</div>
+                      <Input 
+                        type="text" 
+                        value={responses[q.id] || ''} 
+                        onChange={e => updateResponse(q.id, e.target.value.replace(/[^\d.,]/g, ''))} 
+                        placeholder={q.placeholder || "0.00"} 
+                        className="h-12 pl-10 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm font-mono font-bold" 
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+
+          <div className="p-8 bg-zinc-50/50 dark:bg-zinc-900/50 border-t border-zinc-200/50 dark:border-zinc-800/50 rounded-b-[3rem] flex flex-col sm:flex-row justify-between gap-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setCurrentSection(Math.max(0, currentSection - 1))
+                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+              }} 
+              disabled={currentSection === 0}
+              className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-12 px-8 order-2 sm:order-1"
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Strategic Backtrack
+            </Button>
+            
+            {currentSection < SCREENER_SECTIONS.length - 1 ? (
+              <Button 
+                onClick={() => {
+                  setCurrentSection(currentSection + 1)
+                  document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                className="rounded-2xl font-bold h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2"
+              >
+                Proceed to Phase {String(currentSection + 2).padStart(2, '0')}
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleSubmit} 
+                className="rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 px-10 shadow-xl shadow-emerald-500/20 order-1 sm:order-2"
+              >
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Submit Strategic Intelligence
+              </Button>
+            )}
+          </div>
+        </GlassCard>
       </div>
     </div>
   )
@@ -1265,12 +1917,12 @@ function DiagnosticPage({ id }) {
 
   async function handleSubmit() {
     await apiFetch(`/projects/${id}/diagnostic`, { method: 'PUT', body: { responses } })
-    const result = await apiFetch(`/projects/${id}/diagnostic/submit`, { method: 'POST' })
-    toast.success('Diagnostic completed!')
+    await apiFetch(`/projects/${id}/diagnostic/submit`, { method: 'POST' })
+    toast.success('Diagnostic intelligence finalized')
     navigate(`/projects/${id}/scores`)
   }
 
-  if (!loaded) return <PageSkeleton />
+  if (!loaded) return <UIPageSkeleton />
   const pillar = DIAGNOSTIC_PILLARS[currentPillar]
   const progress = ((currentPillar + 1) / DIAGNOSTIC_PILLARS.length) * 100
   const isReadOnly = status === 'completed'
@@ -1285,58 +1937,198 @@ function DiagnosticPage({ id }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="relative space-y-8 bg-transparent px-2 max-w-4xl mx-auto pb-20">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => navigate(`/projects/${id}`)}><ArrowLeft className="w-4 h-4 mr-2" />Back to Project</Button>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">{saving ? <><Loader2 className="w-3 h-3 animate-spin" />Saving...</> : saved ? <><CheckCircle2 className="w-3 h-3 text-green-500" />Saved</> : null}</div>
+        <div className="flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase text-muted-foreground/60">
+          <button onClick={() => navigate('/projects')} className="hover:text-primary hover:underline cursor-pointer transition-colors">Portfolio</button>
+          <ChevronRight className="w-3 h-3" />
+          <button onClick={() => navigate(`/projects/${id}`)} className="hover:text-primary hover:underline cursor-pointer transition-colors">Project</button>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-primary font-black">Diagnostic</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md rounded-full border border-zinc-200 dark:border-zinc-800 shadow-sm">
+            {saving ? (
+              <><Loader2 className="w-3.5 h-3.5 text-primary animate-spin" /><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Syncing Data...</span></>
+            ) : saved ? (
+              <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Data Secured</span></>
+            ) : (
+              <><Clock className="w-3.5 h-3.5 text-muted-foreground/40" /><span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Auto-Saving</span></>
+            )}
+          </div>
+        </div>
       </div>
-      <div>
-        <h1 className="text-2xl font-bold">Diagnostic Assessment</h1>
-        <p className="text-muted-foreground mt-1">Pillar {currentPillar + 1} of {DIAGNOSTIC_PILLARS.length}: {pillar.name} — Weight: {Math.round(pillar.weight * 100)}%</p>
-      </div>
-      <Progress value={progress} className="h-2" />
-      <div className="flex gap-1 overflow-x-auto pb-2">{DIAGNOSTIC_PILLARS.map((p, i) => (
-        <button key={p.id} onClick={() => setCurrentPillar(i)} className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${i === currentPillar ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
-          P{i + 1}
-        </button>
-      ))}</div>
-      <Card className="border-2"><CardContent className="p-6 space-y-8">
-        {pillar.questions.map((rawQ, qi) => {
-          const q = getQuestionData(rawQ)
-          return (
-            <div key={rawQ.id} className="space-y-3">
-              <div className="flex items-start gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">{qi + 1}</span>
-                <div className="flex-1">
-                  <p className="font-medium leading-relaxed">{q.text}</p>
-                  {q.type === 'qualitative' && <Badge variant="outline" className="mt-1 text-xs">Strategic Question</Badge>}
-                </div>
+
+      <header className="space-y-6">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+            <BarChart3 className="w-3 h-3" />
+            Phase 02: Growth Readiness Diagnostic
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Analyze <span className="text-primary">System Maturity</span></h1>
+          <p className="text-muted-foreground font-medium max-w-2xl leading-relaxed">
+            Evaluate the organization across the 7 critical revenue pillars. Your objective assessment drive precise growth recommendations.
+          </p>
+        </div>
+
+        <div className="pt-2 space-y-4">
+          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <span>Pillar Progression</span>
+            <span className="text-primary">Pillar {currentPillar + 1} of {DIAGNOSTIC_PILLARS.length}</span>
+          </div>
+          <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50 shadow-inner">
+            <div className="h-full bg-primary rounded-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(var(--primary),0.4)]" style={{ width: `${progress}%` }} />
+          </div>
+          
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
+            {DIAGNOSTIC_PILLARS.map((p, i) => (
+              <button 
+                key={p.id} 
+                onClick={() => setCurrentPillar(i)}
+                className={cn(
+                  "flex-1 min-w-[100px] group transition-all duration-300",
+                  i === currentPillar ? "opacity-100 scale-100" : "opacity-40 hover:opacity-70 scale-95"
+                )}
+              >
+                <div className={cn(
+                  "h-1.5 rounded-full mb-2 transition-all duration-500",
+                  i < currentPillar ? "bg-emerald-500" : i === currentPillar ? "bg-primary shadow-[0_0_8px_rgba(var(--primary),0.5)]" : "bg-zinc-200 dark:bg-zinc-800"
+                )} />
+                <span className={cn(
+                  "text-[9px] font-black uppercase tracking-tighter block truncate",
+                  i === currentPillar ? "text-primary" : "text-muted-foreground"
+                )}>
+                  {p.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 gap-8">
+        <GlassCard className="p-0 border-zinc-200/50 dark:border-zinc-800/50 shadow-xl overflow-visible">
+          <CardHeader className="p-8 pb-4">
+            <div className="flex items-center gap-4 mb-2">
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                <Shield className="w-6 h-6 stroke-[2px]" />
               </div>
-              {q.type === 'scored' && q.options && (
-                <div className="space-y-2 ml-10">{q.options.map((opt, oi) => (
-                  <button key={oi} disabled={isReadOnly}
-                    onClick={() => updateResponse(rawQ.id, opt.s)}
-                    className={`w-full text-left p-3 rounded-xl border-2 transition-all duration-200 text-sm ${
-                      responses[rawQ.id] === opt.s ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-sm' : 'border-border hover:border-primary/30 hover:bg-muted/50'
-                    } ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}>
-                    <span className={responses[rawQ.id] === opt.s ? 'font-medium text-primary' : ''}>{opt.l}</span>
-                  </button>
-                ))}</div>
-              )}
-              {q.type === 'qualitative' && (
-                <div className="ml-10"><Textarea value={responses[rawQ.id] || ''} onChange={e => updateResponse(rawQ.id, e.target.value)} rows={4} placeholder="Share your thoughts..." disabled={isReadOnly} className="resize-none" /></div>
-              )}
+              <div>
+                <CardTitle className="text-2xl font-bold tracking-tight">{pillar.name}</CardTitle>
+                <CardDescription className="font-medium">Impact Weight: {Math.round(pillar.weight * 100)}%</CardDescription>
+              </div>
             </div>
-          )
-        })}
-      </CardContent></Card>
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={() => setCurrentPillar(Math.max(0, currentPillar - 1))} disabled={currentPillar === 0}><ChevronLeft className="w-4 h-4 mr-1" />Previous Pillar</Button>
-        {currentPillar < DIAGNOSTIC_PILLARS.length - 1 ? (
-          <Button onClick={() => setCurrentPillar(currentPillar + 1)}>Next Pillar<ChevronRight className="w-4 h-4 ml-1" /></Button>
-        ) : !isReadOnly ? (
-          <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="w-4 h-4 mr-2" />Submit Diagnostic</Button>
-        ) : null}
+          </CardHeader>
+          
+          <CardContent className="p-8 pt-4 space-y-12">
+            {pillar.questions.map((rawQ, qi) => {
+              const q = getQuestionData(rawQ)
+              return (
+                <div key={rawQ.id} className="space-y-6 group animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${qi * 100}ms` }}>
+                  <div className="flex items-start gap-4">
+                    <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs font-black shrink-0 border border-zinc-200/50 dark:border-zinc-700/50 group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all duration-300">
+                      {qi + 1}
+                    </span>
+                    <div className="space-y-1.5 flex-1 pt-1">
+                      <p className="text-lg font-bold tracking-tight leading-relaxed text-zinc-800 dark:text-zinc-200">{q.text}</p>
+                      {q.type === 'qualitative' && <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 text-[9px] font-black uppercase tracking-widest px-2">Strategic Insight Required</Badge>}
+                    </div>
+                  </div>
+
+                  <div className="ml-0 sm:ml-12">
+                    {q.type === 'scored' && q.options && (
+                      <div className="grid grid-cols-1 gap-3">
+                        {q.options.map((opt, oi) => (
+                          <button 
+                            key={oi} 
+                            disabled={isReadOnly}
+                            onClick={() => updateResponse(rawQ.id, opt.s)}
+                            className={cn(
+                              "relative w-full text-left p-4 rounded-2xl border-2 transition-all duration-300 group/opt",
+                              responses[rawQ.id] === opt.s 
+                                ? "border-primary bg-primary/5 dark:bg-primary/10 shadow-lg shadow-primary/5" 
+                                : "border-zinc-100 dark:border-zinc-800 bg-white/40 dark:bg-zinc-950/40 hover:border-primary/30 hover:bg-white/60 dark:hover:bg-zinc-900/60"
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <span className={cn(
+                                "text-sm font-semibold tracking-tight leading-snug flex-1",
+                                responses[rawQ.id] === opt.s ? "text-primary font-bold" : "text-muted-foreground group-hover/opt:text-foreground"
+                              )}>
+                                {opt.l}
+                              </span>
+                              <div className={cn(
+                                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 transition-all",
+                                responses[rawQ.id] === opt.s ? "bg-primary text-white scale-110" : "bg-zinc-100 dark:bg-zinc-800 text-muted-foreground"
+                              )}>
+                                {opt.s}
+                              </div>
+                            </div>
+                            {responses[rawQ.id] === opt.s && (
+                              <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-primary rounded-full shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {q.type === 'qualitative' && (
+                      <div className="relative group/text">
+                        <div className="absolute inset-0 bg-primary/5 blur-[20px] rounded-2xl opacity-0 group-focus-within/text:opacity-100 transition-opacity" />
+                        <Textarea 
+                          value={responses[rawQ.id] || ''} 
+                          onChange={e => updateResponse(rawQ.id, e.target.value)} 
+                          rows={5} 
+                          placeholder="Provide qualitative context for this pillar..." 
+                          disabled={isReadOnly} 
+                          className="relative bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-2xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm resize-none p-5 font-medium leading-relaxed" 
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+
+          <div className="p-8 bg-zinc-50/50 dark:bg-zinc-900/50 border-t border-zinc-200/50 dark:border-zinc-800/50 rounded-b-[3rem] flex flex-col sm:flex-row justify-between gap-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (currentPillar === 0) navigate(`/projects/${id}`)
+                else setCurrentPillar(currentPillar - 1)
+                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-12 px-8 order-2 sm:order-1"
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              {currentPillar === 0 ? 'Project Portfolio' : 'Previous Pillar'}
+            </Button>
+            
+            {currentPillar < DIAGNOSTIC_PILLARS.length - 1 ? (
+              <Button 
+                onClick={() => {
+                  setCurrentPillar(currentPillar + 1)
+                  document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                className="rounded-2xl font-bold h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2"
+              >
+                Analyze Next Pillar
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : !isReadOnly ? (
+              <Button 
+                onClick={handleSubmit} 
+                className="rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-12 px-10 shadow-xl shadow-primary/30 order-1 sm:order-2 animate-pulse hover:animate-none"
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Finalize Diagnostic Intelligence
+              </Button>
+            ) : null}
+          </div>
+        </GlassCard>
       </div>
     </div>
   )
@@ -1346,8 +2138,8 @@ function DiagnosticPage({ id }) {
 function ScoresPage({ id }) {
   const { navigate, profile } = useAuth()
   const queryClient = useQueryClient()
-  const { data: scores, isLoading } = useQuery({ queryKey: ['scores', id], queryFn: () => apiFetch(`/projects/${id}/scores`) })
-  const { data: project } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
+  const { data: scores, isLoading: scoresLoading } = useQuery({ queryKey: ['scores', id], queryFn: () => apiFetch(`/projects/${id}/scores`) })
+  const { data: project, isLoading: projectLoading } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
   const [generating, setGenerating] = useState(false)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
   const [showReport, setShowReport] = useState(false)
@@ -1362,7 +2154,7 @@ function ScoresPage({ id }) {
       const result = await apiFetch(`/projects/${id}/report/generate`, { method: 'POST' })
       setReport(result)
       setShowReport(true)
-      toast.success('Report generated successfully!')
+      toast.success('AI Intelligence Report Generated')
       queryClient.invalidateQueries({ queryKey: ['report', id] })
     } catch (err) {
       toast.error(err.message || 'Failed to generate report')
@@ -1377,7 +2169,7 @@ function ScoresPage({ id }) {
       setReport(result)
       setShowReport(true)
     } catch (err) {
-      toast.info('No report found. Click "Generate Report" to create one.')
+      toast.info('No finalized report found. Initiate generation to proceed.')
     }
   }
 
@@ -1385,7 +2177,6 @@ function ScoresPage({ id }) {
     setDownloadingPdf(true)
     try {
       const result = await apiFetch(`/projects/${id}/report/pdf`)
-      // Decode base64 and download
       const byteCharacters = atob(result.pdf)
       const byteNumbers = new Array(byteCharacters.length)
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -1396,14 +2187,14 @@ function ScoresPage({ id }) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = result.filename || 'RAD_Report.pdf'
+      a.download = result.filename || `${project?.company_name || 'RAD'}_Executive_Report.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success('PDF downloaded!')
+      toast.success('Executive PDF Exported')
     } catch (err) {
-      toast.error(err.message || 'Failed to download PDF. Generate report first.')
+      toast.error('Export failed. Please generate the AI report first.')
     } finally {
       setDownloadingPdf(false)
     }
@@ -1411,63 +2202,29 @@ function ScoresPage({ id }) {
 
   function exportToCSV() {
     if (!scores || !project) {
-      toast.error('No data to export')
+      toast.error('No data available for export')
       return
     }
 
     const companyName = project.company_name || 'Company'
     const rows = []
-    
-    // Header row
     rows.push(['Biz Ascend RAD - Diagnostic Export'])
     rows.push(['Company', companyName])
     rows.push(['Industry', project.industry || ''])
     rows.push(['Export Date', new Date().toLocaleDateString()])
     rows.push([])
-    
-    // Overall scores
     rows.push(['=== OVERALL SCORES ==='])
     rows.push(['RAD Score', scores.radScore])
     rows.push(['Maturity Band', scores.maturityBand])
     rows.push(['Primary Constraint', scores.primaryConstraint?.name || ''])
     rows.push([])
-    
-    // Pillar scores
     rows.push(['=== PILLAR SCORES ==='])
     rows.push(['Pillar', 'Score', 'Average', 'Status'])
     Object.entries(scores.pillarScores || {}).forEach(([pid, data]) => {
       const status = data.avg >= 4 ? 'Strong' : data.avg >= 3 ? 'Developing' : 'At Risk'
       rows.push([PILLAR_NAMES[pid] || pid, data.score, data.avg?.toFixed(2), status])
     })
-    rows.push([])
     
-    // RAPS
-    if (scores.raps) {
-      rows.push(['=== REVENUE ACHIEVEMENT PROBABILITY (RAPS) ==='])
-      rows.push(['RAPS Score', `${scores.raps.score}%`])
-      rows.push(['Revenue Target', `$${(scores.raps.revenueTarget || 0).toLocaleString()}`])
-      rows.push(['Already Invoiced', `$${(scores.raps.revenueInvoiced || 0).toLocaleString()}`])
-      rows.push(['Remaining', `$${(scores.raps.revenueRemaining || 0).toLocaleString()}`])
-      rows.push(['Months Left', scores.raps.monthsRemaining])
-      rows.push([])
-    }
-    
-    // Assessment history
-    if (project.assessments?.length > 1) {
-      rows.push(['=== ASSESSMENT HISTORY ==='])
-      rows.push(['Assessment #', 'RAD Score', 'RAPS %', 'Maturity Band', 'Completed'])
-      project.assessments.filter(a => a.scores).forEach(a => {
-        rows.push([
-          a.assessment_number,
-          a.scores?.radScore || '',
-          a.scores?.raps?.score ? `${a.scores.raps.score}%` : '',
-          a.scores?.maturityBand || '',
-          a.completed_at ? new Date(a.completed_at).toLocaleDateString() : ''
-        ])
-      })
-    }
-    
-    // Convert to CSV string
     const csvContent = rows.map(row => row.map(cell => {
       const str = String(cell ?? '')
       return str.includes(',') || str.includes('"') || str.includes('\n') 
@@ -1475,31 +2232,29 @@ function ScoresPage({ id }) {
         : str
     }).join(',')).join('\n')
     
-    // Download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${companyName.replace(/\s+/g, '_')}_RAD_Scores.csv`
+    a.download = `${companyName.replace(/\s+/g, '_')}_Intelligence_Data.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    toast.success('CSV exported!')
+    toast.success('Intelligence Data Exported')
   }
 
   async function sendToClient(e) {
     e.preventDefault()
     if (!emailForm.email) {
-      toast.error('Please enter a recipient email')
+      toast.error('Recipient identity required')
       return
     }
     setSendingEmail(true)
     try {
-      // In demo mode, simulate sending
       if (_demoMode) {
         await new Promise(r => setTimeout(r, 2000))
-        toast.success(`Report sent to ${emailForm.email}!`)
+        toast.success(`Executive Report dispatched to ${emailForm.email}`)
         setShowSendDialog(false)
         setEmailForm({ email: '', message: '' })
       } else {
@@ -1507,25 +2262,23 @@ function ScoresPage({ id }) {
           method: 'POST',
           body: { project_id: id, recipient_email: emailForm.email, message: emailForm.message }
         })
-        toast.success(`Report sent to ${emailForm.email}!`)
+        toast.success(`Executive Report dispatched to ${emailForm.email}`)
         setShowSendDialog(false)
         setEmailForm({ email: '', message: '' })
       }
     } catch (err) {
-      toast.error(err.message || 'Failed to send email')
+      toast.error('Dispatch failed. System reported: ' + (err.message || 'Unknown error'))
     } finally {
       setSendingEmail(false)
     }
   }
 
-  if (isLoading) return <PageSkeleton />
-  if (!scores) return <div className="text-center py-20"><p className="text-muted-foreground">No scores available</p></div>
+  if (scoresLoading || projectLoading) return <UIPageSkeleton />
+  if (!scores) return <div className="text-center py-24"><GlassCard className="p-12 max-w-md mx-auto"><AlertTriangle className="w-12 h-12 text-muted-foreground opacity-20 mx-auto mb-4" /><p className="text-muted-foreground font-medium">Intelligence data not finalized</p><Button variant="ghost" className="mt-4" onClick={() => navigate(`/projects/${id}`)}>Return to Project</Button></GlassCard></div>
 
-  const bandColor = scores.maturityBand?.includes('Strong') ? 'green' : scores.maturityBand?.includes('Developing') ? 'amber' : scores.maturityBand?.includes('Fragile') ? 'orange' : 'red'
-  const bandColorClass = { green: 'bg-green-500', amber: 'bg-amber-500', orange: 'bg-orange-500', red: 'bg-red-500' }
-  const trafficLight = (avg) => avg >= 4 ? 'bg-green-500' : avg >= 3 ? 'bg-amber-500' : 'bg-red-500'
+  const bandColor = scores.maturityBand?.includes('Strong') ? 'emerald' : scores.maturityBand?.includes('Developing') ? 'amber' : scores.maturityBand?.includes('Fragile') ? 'zinc' : 'rose'
+  const trafficLight = (avg) => avg >= 4 ? 'bg-emerald-500' : avg >= 3 ? 'bg-amber-500' : 'bg-rose-500'
   
-  // Prepare chart data for pillar radar
   const radarData = Object.entries(scores.pillarScores || {}).map(([pid, data]) => ({
     pillar: PILLAR_NAMES[pid]?.split(' ')[0] || pid,
     fullName: PILLAR_NAMES[pid],
@@ -1533,9 +2286,7 @@ function ScoresPage({ id }) {
     fullMark: 100
   }))
 
-  // Prepare trend data if multiple assessments exist
-  const assessments = project?.assessments || []
-  const trendData = assessments.filter(a => a.scores).map(a => ({
+  const trendData = (project?.assessments || []).filter(a => a.scores).map(a => ({
     name: `#${a.assessment_number}`,
     radScore: a.scores?.radScore || 0,
     raps: a.scores?.raps?.score || 0,
@@ -1543,328 +2294,491 @@ function ScoresPage({ id }) {
   })).reverse()
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <Button variant="ghost" onClick={() => navigate(`/projects/${id}`)}><ArrowLeft className="w-4 h-4 mr-2" />Back to Project</Button>
+    <div className="relative space-y-8 bg-transparent px-2 max-w-6xl mx-auto pb-20">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10" />
+      
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase text-muted-foreground/60">
+          <button onClick={() => navigate('/projects')} className="hover:text-primary hover:underline cursor-pointer transition-colors">Portfolio</button>
+          <ChevronRight className="w-3 h-3" />
+          <button onClick={() => navigate(`/projects/${id}`)} className="hover:text-primary hover:underline cursor-pointer transition-colors">Project</button>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-primary font-black">Intelligence</span>
+        </div>
+        
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={exportToCSV} data-testid="export-csv-btn">
-            <FileSpreadsheet className="w-4 h-4 mr-2" />Export CSV
+          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={exportToCSV}>
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            CSV Data
           </Button>
-          <Button variant="outline" onClick={() => setShowSendDialog(true)} data-testid="send-to-client-btn">
-            <Mail className="w-4 h-4 mr-2" />Send to Client
+          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={() => setShowSendDialog(true)}>
+            <Mail className="w-4 h-4 mr-2" />
+            Send Report
           </Button>
-          <Button variant="outline" onClick={loadReport} data-testid="view-report-btn">
-            <FileText className="w-4 h-4 mr-2" />View Report
+          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={loadReport}>
+            <FileText className="w-4 h-4 mr-2" />
+            Final Report
           </Button>
-          <Button variant="outline" onClick={downloadPdf} disabled={downloadingPdf} data-testid="download-pdf-btn">
-            {downloadingPdf ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Downloading...</> : <><Download className="w-4 h-4 mr-2" />Download PDF</>}
-          </Button>
-          <Button onClick={generateReport} disabled={generating} data-testid="generate-report-btn">
-            {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating...</> : <><Zap className="w-4 h-4 mr-2" />Generate AI Report</>}
+          <Button className="rounded-2xl font-bold h-10 px-6 shadow-lg shadow-primary/20" onClick={generateReport} disabled={generating}>
+            {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
+            Generate AI Intelligence
           </Button>
         </div>
       </div>
-      
-      {/* Overall Score */}
-      <Card className="border-2 overflow-hidden">
-        <div className={`h-2 ${bandColorClass[bandColor]}`} />
-        <CardContent className="p-8 text-center">
-          <p className="text-sm text-muted-foreground mb-2">RAD Growth System Score</p>
-          <p className="text-7xl font-bold text-primary tracking-tighter">{scores.radScore}</p>
-          <Badge className={`mt-4 text-base px-4 py-1.5 ${bandColorClass[bandColor]} text-white`}>{scores.maturityBand}</Badge>
-          {scores.primaryConstraint && (
-            <div className="mt-6 p-4 rounded-xl bg-destructive/5 border border-destructive/20 inline-block">
-              <p className="text-sm text-muted-foreground">Primary Growth Constraint</p>
-              <p className="text-lg font-bold text-destructive mt-1">{scores.primaryConstraint.name}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pillar Radar Chart */}
-        <Card className="border-2">
-          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="w-5 h-5 text-primary" />Pillar Performance</CardTitle></CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="hsl(var(--border))" />
-                  <PolarAngleAxis dataKey="pillar" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
-                  <Radar name="Score" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} strokeWidth={2} />
-                  <Tooltip content={({ payload }) => payload?.[0] ? (
-                    <div className="bg-popover border rounded-lg p-2 shadow-lg">
-                      <p className="font-medium text-sm">{payload[0].payload.fullName}</p>
-                      <p className="text-primary font-bold">{payload[0].value}/100</p>
-                    </div>
-                  ) : null} />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      <header className="space-y-1.5">
+        <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+          <LayoutDashboard className="w-3 h-3" />
+          Revenue Acceleration Intelligence
+        </div>
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Strategic <span className="text-primary">Performance Analysis</span></h1>
+        <p className="text-muted-foreground font-medium max-w-2xl leading-relaxed">
+          Comprehensive diagnostic output for <span className="text-foreground font-bold">{project?.company_name}</span>. Review system maturity and primary constraints.
+        </p>
+      </header>
 
-        {/* Score Trend Chart */}
-        {trendData.length > 1 ? (
-          <Card className="border-2">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="w-5 h-5 text-primary" />Score Trend</CardTitle></CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-                    <YAxis domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-                    <Tooltip content={({ payload, label }) => payload?.length ? (
-                      <div className="bg-popover border rounded-lg p-3 shadow-lg">
-                        <p className="font-medium mb-2">Assessment {label}</p>
-                        {payload.map((p, i) => (
-                          <p key={i} style={{ color: p.color }} className="text-sm">{p.name}: <span className="font-bold">{p.value}</span></p>
-                        ))}
-                      </div>
-                    ) : null} />
-                    <Legend />
-                    <Line type="monotone" dataKey="radScore" name="RAD Score" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 6 }} activeDot={{ r: 8 }} />
-                    <Line type="monotone" dataKey="raps" name="RAPS %" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-2">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="w-5 h-5 text-primary" />Pillar Scores</CardTitle></CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={radarData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-                    <YAxis type="category" dataKey="pillar" width={80} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                    <Tooltip content={({ payload }) => payload?.[0] ? (
-                      <div className="bg-popover border rounded-lg p-2 shadow-lg">
-                        <p className="font-medium text-sm">{payload[0].payload.fullName}</p>
-                        <p className="text-primary font-bold">{payload[0].value}/100</p>
-                      </div>
-                    ) : null} />
-                    <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+      {/* Main Intelligence Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* RAD Score Focus */}
+        <GlassCard className="p-10 lg:col-span-1 flex flex-col items-center justify-center text-center relative overflow-hidden border-primary/10">
+          <div className="relative z-10 space-y-6">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">System Maturity Score</p>
+              <div className="text-8xl font-black tracking-tighter text-primary animate-in zoom-in duration-700">{scores.radScore}</div>
+            </div>
+            
+            <div className="space-y-4">
+              <Badge className={cn("text-white font-black px-6 py-2 rounded-full text-sm tracking-wider shadow-lg", `bg-${bandColor}-500 shadow-${bandColor}-500/20`)}>
+                {scores.maturityBand?.toUpperCase()}
+              </Badge>
+              
+              {scores.primaryConstraint && (
+                <div className="p-5 rounded-[2rem] bg-rose-500/5 border border-rose-500/10 backdrop-blur-sm">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-rose-500 mb-1">Primary Constraint</p>
+                  <p className="text-lg font-bold tracking-tight text-rose-600 dark:text-rose-400">{scores.primaryConstraint.name}</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Progress ring background */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] dark:opacity-[0.05] pointer-events-none">
+            <Zap className="w-64 h-64 text-primary" />
+          </div>
+        </GlassCard>
+
+        {/* Pillar Visualization */}
+        <GlassCard className="lg:col-span-2 p-8 border-zinc-200/50 dark:border-zinc-800/50">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold tracking-tight">Pillar Breakdown</h3>
+              <p className="text-xs text-muted-foreground font-medium">Performance across all growth dimensions</p>
+            </div>
+            <div className="flex gap-1.5">
+              {['emerald', 'amber', 'rose'].map((c) => (
+                <div key={c} className={cn("w-2 h-2 rounded-full", `bg-${c}-500`)} />
+              ))}
+            </div>
+          </div>
+          
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={radarData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                <PolarGrid stroke="currentColor" className="text-zinc-200 dark:text-zinc-800" />
+                <PolarAngleAxis dataKey="pillar" tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 700 }} className="text-muted-foreground" />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                <Radar name="Score" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} strokeWidth={3} />
+                <RechartsTooltip content={({ payload }) => payload?.[0] ? (
+                  <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-3 rounded-2xl shadow-2xl">
+                    <p className="font-bold text-xs uppercase tracking-wider mb-1 text-muted-foreground">{payload[0].payload.fullName}</p>
+                    <p className="text-2xl font-black text-primary">{payload[0].value}</p>
+                  </div>
+                ) : null} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
       </div>
 
-      {/* Pillar Details */}
-      <Card className="border-2">
-        <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" />Diagnostic Overview</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-3">{Object.entries(scores.pillarScores || {}).map(([pid, data], i) => {
-            const isPrimary = scores.primaryConstraint?.id === pid
-            return (
-              <div key={pid} className={`p-4 rounded-xl border-2 transition-all ${isPrimary ? 'border-destructive/40 bg-destructive/5' : 'border-border'}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${trafficLight(data.avg)}`} />
-                    <span className={`font-medium ${isPrimary ? 'text-destructive' : ''}`}>{PILLAR_NAMES[pid]}</span>
-                    {isPrimary && <Badge variant="destructive" className="text-xs">Primary Constraint</Badge>}
+      {/* RAPS & Detailed Analysis */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <GlassCard className="p-8 border-zinc-200/50 dark:border-zinc-800/50">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold tracking-tight">System Components</h3>
+              <p className="text-xs text-muted-foreground font-medium">Granular maturity analysis</p>
+            </div>
+            <Target className="w-5 h-5 text-primary opacity-20" />
+          </div>
+          
+          <div className="space-y-4">
+            {Object.entries(scores.pillarScores || {}).map(([pid, data]) => {
+              const isPrimary = scores.primaryConstraint?.id === pid
+              return (
+                <div key={pid} className={cn(
+                  "p-4 rounded-2xl border transition-all duration-500",
+                  isPrimary ? "bg-rose-500/5 border-rose-500/20 shadow-lg shadow-rose-500/5" : "bg-white/40 dark:bg-zinc-950/40 border-zinc-100 dark:border-zinc-800"
+                )}>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm", trafficLight(data.avg))} />
+                      <span className={cn("text-sm font-bold tracking-tight", isPrimary ? "text-rose-600 dark:text-rose-400" : "text-zinc-700 dark:text-zinc-300")}>
+                        {PILLAR_NAMES[pid]}
+                      </span>
+                    </div>
+                    <span className="text-sm font-black tabular-nums">{data.score}</span>
                   </div>
-                  <span className="font-bold text-lg">{data.score}</span>
+                  <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-full overflow-hidden">
+                    <div className={cn("h-full rounded-full transition-all duration-1000 ease-out", trafficLight(data.avg))} style={{ width: `${data.score}%` }} />
+                  </div>
                 </div>
-                <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-500 ${trafficLight(data.avg)}`} style={{ width: `${data.score}%` }} />
+              )
+            })}
+          </div>
+        </GlassCard>
+
+        <div className="space-y-8">
+          {scores.raps && (
+            <GlassCard className="p-8 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-none shadow-2xl relative overflow-hidden group">
+              <div className="relative z-10 flex flex-col h-full justify-between gap-8">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-bold tracking-tight opacity-100">Revenue Probability</h3>
+                    <p className="text-xs font-bold uppercase tracking-widest opacity-50">RAPS Intelligence</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                    <Target className="w-6 h-6 text-white stroke-[2.5px]" />
+                  </div>
+                </div>
+                
+                <div className="flex items-baseline gap-2">
+                  <span className="text-7xl font-black tracking-tighter">{scores.raps.score}%</span>
+                  <span className="text-xs font-bold uppercase tracking-widest opacity-50 mb-3">Confidence</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-white/5 dark:bg-zinc-100 border border-white/10 dark:border-zinc-200">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1 text-primary">Target</p>
+                    <p className="text-lg font-bold tabular-nums tracking-tight">${(scores.raps.revenueTarget || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white/5 dark:bg-zinc-100 border border-white/10 dark:border-zinc-200">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1 text-emerald-500">Invoiced</p>
+                    <p className="text-lg font-bold tabular-nums tracking-tight">${(scores.raps.revenueInvoiced || 0).toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
-            )
-          })}</div>
-        </CardContent>
-      </Card>
+              
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-primary/10 blur-[60px] rounded-full group-hover:scale-150 transition-transform duration-1000" />
+            </GlassCard>
+          )}
 
-      {/* RAPS */}
-      {scores.raps && (
-        <Card className="border-2">
-          <CardHeader><CardTitle className="flex items-center gap-2"><Target className="w-5 h-5 text-primary" />Revenue Achievement Probability Score (RAPS)</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center p-6 rounded-xl bg-muted/50">
-              <p className="text-6xl font-bold text-primary">{scores.raps.score}%</p>
-              <p className="text-muted-foreground mt-2">{scores.raps.score >= 70 ? 'High probability' : scores.raps.score >= 40 ? 'Moderate probability' : 'Low probability'} of achieving revenue target</p>
+          <GlassCard className="p-8 border-zinc-200/50 dark:border-zinc-800/50">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold tracking-tight">Intelligence History</h3>
+              <Clock className="w-4 h-4 text-muted-foreground opacity-30" />
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="p-3 rounded-lg bg-muted/50 text-center"><p className="text-xs text-muted-foreground">Revenue Target</p><p className="font-bold mt-1">${(scores.raps.revenueTarget || 0).toLocaleString()}</p></div>
-              <div className="p-3 rounded-lg bg-muted/50 text-center"><p className="text-xs text-muted-foreground">Already Invoiced</p><p className="font-bold mt-1">${(scores.raps.revenueInvoiced || 0).toLocaleString()}</p></div>
-              <div className="p-3 rounded-lg bg-muted/50 text-center"><p className="text-xs text-muted-foreground">Remaining</p><p className="font-bold mt-1">${(scores.raps.revenueRemaining || 0).toLocaleString()}</p></div>
-              <div className="p-3 rounded-lg bg-muted/50 text-center"><p className="text-xs text-muted-foreground">Months Left</p><p className="font-bold mt-1">{scores.raps.monthsRemaining}</p></div>
+            
+            <div className="space-y-4">
+              {trendData.length > 1 ? (
+                <div className="h-[180px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="8 8" stroke="currentColor" className="text-zinc-100 dark:text-zinc-800" vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600 }} dy={10} className="text-muted-foreground" />
+                      <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600 }} className="text-muted-foreground" />
+                      <RechartsTooltip content={({ active, payload }) => active && payload?.length ? (
+                        <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-2 rounded-xl shadow-xl">
+                          <p className="text-[10px] font-black uppercase text-primary">{payload[0].name}: {payload[0].value}</p>
+                        </div>
+                      ) : null} />
+                      <Area type="monotone" dataKey="radScore" name="RAD Score" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="py-10 text-center space-y-3 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                  <ActivityIcon className="w-8 h-8 text-muted-foreground opacity-20 mx-auto" />
+                  <p className="text-xs text-muted-foreground font-medium italic">Baseline established. Subsequent assessments will generate trend intelligence.</p>
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </GlassCard>
+        </div>
+      </div>
 
       {/* AI Report Dialog */}
       <Dialog open={showReport} onOpenChange={setShowReport}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" />AI-Generated Diagnostic Report</DialogTitle>
-            <DialogDescription>Powered by Claude AI</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] border-zinc-200 dark:border-zinc-800 p-0 shadow-2xl">
+          <div className="sticky top-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800 p-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <FileText className="w-5 h-5 stroke-[2px]" />
+              </div>
+              <div>
+                <DialogTitle className="text-2xl font-bold tracking-tight">AI Intelligence Report</DialogTitle>
+                <DialogDescription className="font-medium text-xs uppercase tracking-widest text-primary/60 flex items-center gap-1.5">
+                  <Zap className="w-3 h-3" /> Engineered by Biz Ascend RAD™
+                </DialogDescription>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="rounded-xl border-zinc-200 dark:border-zinc-800 font-bold h-10" onClick={downloadPdf} disabled={downloadingPdf}>
+                {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                Export PDF
+              </Button>
+              <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10" onClick={() => setShowReport(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+
           {report && (
-            <div className="space-y-6 py-4">
-              {/* Executive Summary */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold flex items-center gap-2"><Award className="w-5 h-5 text-primary" />Executive Summary</h3>
-                <div className="p-4 bg-muted/50 rounded-xl text-sm leading-relaxed whitespace-pre-wrap">{report.executive_summary}</div>
-              </div>
-              {/* Pillar Narratives */}
-              <div className="space-y-3">
-                <h3 className="text-lg font-bold">Pillar Analysis</h3>
-                {report.pillar_narratives && Object.entries(report.pillar_narratives).map(([pid, narrative]) => (
-                  <div key={pid} className="p-4 border rounded-xl">
-                    <h4 className="font-semibold text-primary mb-2">{PILLAR_NAMES[pid]}</h4>
-                    <p className="text-sm text-muted-foreground">{narrative}</p>
+            <div className="p-8 space-y-12">
+              {/* Executive Summary Section */}
+              <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+                  Executive Overview
+                </div>
+                <div className="p-8 rounded-[2.5rem] bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-inner relative overflow-hidden">
+                  <div className="relative z-10 text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 font-medium italic serif">
+                    &ldquo;{report.executive_summary}&rdquo;
                   </div>
-                ))}
-              </div>
-              {/* Positioning Assessment */}
-              {report.positioning_assessment && (
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold flex items-center gap-2"><Shield className="w-5 h-5 text-primary" />Positioning Assessment</h3>
-                  <div className="p-4 bg-muted/50 rounded-xl text-sm leading-relaxed whitespace-pre-wrap">{report.positioning_assessment}</div>
+                  <Award className="absolute -bottom-6 -right-6 w-32 h-32 text-primary opacity-[0.03] rotate-12" />
                 </div>
+              </section>
+
+              {/* Action Plan Section */}
+              {report.action_plan && (
+                <section className="space-y-6">
+                  <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+                    Revenue Acceleration Roadmap
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[
+                      { title: report.action_plan.phase1_title, items: report.action_plan.phase1_items, color: 'rose', icon: Clock },
+                      { title: report.action_plan.phase2_title, items: report.action_plan.phase2_items, color: 'amber', icon: Target },
+                      { title: report.action_plan.phase3_title, items: report.action_plan.phase3_items, color: 'emerald', icon: Zap },
+                    ].map((phase, i) => (
+                      <div key={i} className={cn(
+                        "p-6 rounded-[2rem] border relative overflow-hidden group transition-all duration-500 hover:-translate-y-1",
+                        `bg-${phase.color}-500/5 border-${phase.color}-500/10 hover:border-${phase.color}-500/30`
+                      )}>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className={cn("font-black text-sm uppercase tracking-wider", `text-${phase.color}-600 dark:text-${phase.color}-400`)}>{phase.title}</h4>
+                          <phase.icon className={cn("w-4 h-4 opacity-40", `text-${phase.color}-500`)} />
+                        </div>
+                        <ul className="space-y-3">
+                          {(phase.items || []).map((item, ii) => (
+                            <li key={ii} className="text-sm font-medium flex items-start gap-2.5 text-zinc-700 dark:text-zinc-300">
+                              <span className={cn("w-1.5 h-1.5 rounded-full mt-1.5 shrink-0", `bg-${phase.color}-500`)} />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               )}
-              {/* Strategic Moat */}
-              {report.strategic_moat_narrative && (
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold">Strategic Moat Score: {report.strategic_moat_score}/10</h3>
-                  <div className="p-4 bg-muted/50 rounded-xl text-sm leading-relaxed">{report.strategic_moat_narrative}</div>
-                </div>
-              )}
+
               {/* RAPS Narrative */}
               {report.raps_narrative && (
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" />Revenue Achievement Analysis</h3>
-                  <div className="p-4 bg-muted/50 rounded-xl text-sm leading-relaxed whitespace-pre-wrap">{report.raps_narrative}</div>
-                  {report.raps_improvement_scenario && (
-                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl text-sm">
-                      <p className="font-semibold text-green-700 dark:text-green-400 mb-1">Improvement Scenario</p>
-                      <p className="text-green-600 dark:text-green-300">{report.raps_improvement_scenario}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* Action Plan */}
-              {report.action_plan && (
-                <div className="space-y-3">
-                  <h3 className="text-lg font-bold flex items-center gap-2"><Target className="w-5 h-5 text-primary" />30-60-90 Day Action Plan</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
-                      <h4 className="font-semibold text-red-700 dark:text-red-400 mb-2">{report.action_plan.phase1_title}</h4>
-                      <ul className="space-y-1">{(report.action_plan.phase1_items || []).map((item, i) => (
-                        <li key={i} className="text-sm flex items-start gap-2"><span className="text-red-500 mt-1">•</span>{item}</li>
-                      ))}</ul>
-                    </div>
-                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
-                      <h4 className="font-semibold text-amber-700 dark:text-amber-400 mb-2">{report.action_plan.phase2_title}</h4>
-                      <ul className="space-y-1">{(report.action_plan.phase2_items || []).map((item, i) => (
-                        <li key={i} className="text-sm flex items-start gap-2"><span className="text-amber-500 mt-1">•</span>{item}</li>
-                      ))}</ul>
-                    </div>
-                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                      <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">{report.action_plan.phase3_title}</h4>
-                      <ul className="space-y-1">{(report.action_plan.phase3_items || []).map((item, i) => (
-                        <li key={i} className="text-sm flex items-start gap-2"><span className="text-green-500 mt-1">•</span>{item}</li>
-                      ))}</ul>
-                    </div>
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+                    Revenue Achievement Analysis
                   </div>
-                </div>
-              )}
-              {/* Market Report */}
-              {report.market_report?.countries?.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-lg font-bold flex items-center gap-2"><Gauge className="w-5 h-5 text-primary" />Market Opportunity Analysis</h3>
-                  {report.market_report.countries.map((country, ci) => (
-                    <Card key={ci} className="border">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center justify-between">
-                          <span>{country.name}</span>
-                          <Badge variant={country.growth_propensity === 'High' ? 'default' : country.growth_propensity === 'Medium-High' ? 'secondary' : 'outline'}>{country.growth_propensity} Growth</Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {country.dimensions?.map((dim, di) => (
-                          <div key={di}>
-                            <p className="text-sm font-medium">{dim.name}</p>
-                            <ul className="text-xs text-muted-foreground space-y-0.5 ml-3">{(dim.findings || []).map((f, fi) => <li key={fi}>• {f}</li>)}</ul>
+                  <GlassCard className="p-8 border-primary/5">
+                    <div className="flex flex-col md:flex-row gap-8">
+                      <div className="flex-1 space-y-4">
+                        <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300 italic">{report.raps_narrative}</p>
+                        {report.raps_improvement_scenario && (
+                          <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-sm font-bold text-emerald-600 dark:text-emerald-400 shadow-sm">
+                            Strategic Leverage: {report.raps_improvement_scenario}
                           </div>
-                        ))}
-                        <div className="pt-2 border-t text-sm">
-                          <p><span className="font-medium">Key Drivers:</span> {country.key_drivers}</p>
-                          <p><span className="font-medium">Risks:</span> {country.risks}</p>
-                          <p><span className="font-medium">Strategic Implications:</span> {country.strategic_implications}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        )}
+                      </div>
+                      <div className="w-full md:w-48 flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-900 rounded-[2rem] border border-zinc-100 dark:border-zinc-800">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">RAPS Score</span>
+                        <span className="text-5xl font-black text-emerald-500 tabular-nums">{scores.raps?.score}%</span>
+                      </div>
+                    </div>
+                  </GlassCard>
+                </section>
               )}
-              <p className="text-xs text-muted-foreground text-center pt-4">Generated {report.generated_at ? new Date(report.generated_at).toLocaleString() : 'recently'}</p>
+
+              {/* Pillar Analysis */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+                  Pillar Maturity Narratives
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {report.pillar_narratives && Object.entries(report.pillar_narratives).map(([pid, narrative], i) => {
+                    const isConstraint = scores.primaryConstraint?.id === pid
+                    return (
+                      <div key={pid} className={cn(
+                        "p-6 rounded-[2rem] border transition-all duration-500",
+                        isConstraint ? "bg-rose-500/5 border-rose-500/20" : "bg-white/40 dark:bg-zinc-950/40 border-zinc-100 dark:border-zinc-800"
+                      )}>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className={cn("font-bold text-base tracking-tight", isConstraint ? "text-rose-600 dark:text-rose-400" : "text-primary")}>{PILLAR_NAMES[pid]}</h4>
+                          {isConstraint && <Badge variant="destructive" className="text-[8px] font-black uppercase px-2 py-0">Critical Constraint</Badge>}
+                        </div>
+                        <p className="text-sm text-muted-foreground font-medium leading-relaxed">{narrative}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* Market Intelligence */}
+              {report.market_report?.countries?.length > 0 && (
+                <section className="space-y-6">
+                  <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
+                    Global Market Intelligence
+                  </div>
+                  <div className="space-y-6">
+                    {report.market_report.countries.map((country, ci) => (
+                      <div key={ci} className="group p-8 rounded-[2.5rem] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all duration-700 overflow-hidden relative">
+                        <div className="relative z-10 space-y-6">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-2xl font-bold tracking-tight">{country.name}</h4>
+                            <Badge className={cn(
+                              "font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg",
+                              country.growth_propensity === 'High' ? 'bg-emerald-500 shadow-emerald-500/20' : country.growth_propensity === 'Medium-High' ? 'bg-blue-500 shadow-blue-500/20' : 'bg-zinc-500 shadow-zinc-500/20'
+                            )}>
+                              {country.growth_propensity} Growth Potential
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {country.dimensions?.map((dim, di) => (
+                              <div key={di} className="space-y-2">
+                                <p className="text-xs font-black uppercase tracking-[0.15em] text-primary">{dim.name}</p>
+                                <ul className="space-y-1.5">
+                                  {(dim.findings || []).map((f, fi) => (
+                                    <li key={fi} className="text-sm font-medium text-zinc-600 dark:text-zinc-400 flex items-start gap-2">
+                                      <span className="text-primary mt-1 opacity-40 leading-none">›</span>
+                                      {f}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-black uppercase tracking-widest opacity-40">Primary Drivers</p>
+                              <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 leading-relaxed">{country.key_drivers}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-black uppercase tracking-widest opacity-40 text-rose-500">Risk Profile</p>
+                              <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 leading-relaxed">{country.risks}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-black uppercase tracking-widest opacity-40 text-emerald-500">Strategic Entry</p>
+                              <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 leading-relaxed">{country.strategic_implications}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full -mr-32 -mt-32 opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+              
+              <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 flex flex-col items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-primary rounded-lg flex items-center justify-center">
+                    <Zap className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Certified Intelligence Output</span>
+                </div>
+                <p className="text-[10px] font-bold text-muted-foreground/40 italic">Generated {report.generated_at ? new Date(report.generated_at).toLocaleString() : 'recently'}</p>
+              </div>
             </div>
           )}
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => { setShowReport(false); setShowSendDialog(true) }}>
-              <Mail className="w-4 h-4 mr-2" />Send to Client
+          
+          <div className="sticky bottom-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 p-6 flex justify-between items-center">
+            <Button variant="ghost" className="rounded-xl font-bold h-11 px-6 text-muted-foreground hover:text-primary" onClick={() => setShowReport(false)}>
+              Close Intelligence Report
             </Button>
-            <Button variant="outline" onClick={downloadPdf} disabled={downloadingPdf}>
-              {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Download PDF
-            </Button>
-            <Button variant="outline" onClick={() => setShowReport(false)}>Close</Button>
-          </DialogFooter>
+            <div className="flex gap-3">
+              <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-11 px-8" onClick={() => { setShowReport(false); setShowSendDialog(true) }}>
+                <Mail className="w-4 h-4 mr-2" />Dispatch to Principal
+              </Button>
+              <Button className="rounded-2xl font-bold h-11 px-10 shadow-xl shadow-primary/20" onClick={downloadPdf} disabled={downloadingPdf}>
+                {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Export Executive Brief
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Send to Client Dialog */}
       <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Mail className="w-5 h-5 text-primary" />Send Report to Client</DialogTitle>
-            <DialogDescription>Email the PDF report directly to your client</DialogDescription>
+        <DialogContent className="max-w-md rounded-[2.5rem] border-zinc-200 dark:border-zinc-800 p-8 shadow-2xl">
+          <DialogHeader className="mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+              <Send className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-2xl font-bold tracking-tight">Dispatch Report</DialogTitle>
+            <DialogDescription className="font-medium">Securely deliver the Intelligence Report to the organization principal.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={sendToClient} className="space-y-4">
+          <form onSubmit={sendToClient} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="recipient-email">Recipient Email *</Label>
+              <Label htmlFor="recipient-email" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Principal Identity (Email)</Label>
               <Input 
                 id="recipient-email" 
                 type="email" 
                 value={emailForm.email} 
                 onChange={e => setEmailForm({...emailForm, email: e.target.value})}
-                placeholder="client@company.com"
+                placeholder="principal@organization.com"
                 required
+                className="h-12 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary font-medium"
                 data-testid="send-email-input"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email-message">Personal Message (optional)</Label>
+              <Label htmlFor="email-message" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Executive Commentary (Optional)</Label>
               <Textarea 
                 id="email-message" 
                 value={emailForm.message} 
                 onChange={e => setEmailForm({...emailForm, message: e.target.value})}
-                placeholder="Add a personal note to your client..."
-                rows={3}
+                placeholder="Provide strategic context for the principal..."
+                rows={4}
+                className="bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary font-medium resize-none p-4 leading-relaxed"
               />
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-sm">
-              <p className="text-muted-foreground">The email will include:</p>
-              <ul className="mt-2 space-y-1 text-muted-foreground">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" />RAD Score: <span className="font-medium text-foreground">{scores?.radScore}</span></li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" />Full PDF report attached</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" />Sent from: <span className="font-medium text-foreground">{profile?.full_name || profile?.email}</span></li>
+            <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Security Encapsulated Data:</p>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-3 text-xs font-bold text-zinc-600 dark:text-zinc-400">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  RAD Intelligence Score: <span className="text-primary font-black ml-auto">{scores?.radScore}</span>
+                </li>
+                <li className="flex items-center gap-3 text-xs font-bold text-zinc-600 dark:text-zinc-400">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Full Executive PDF attached
+                </li>
+                <li className="flex items-center gap-3 text-xs font-bold text-zinc-600 dark:text-zinc-400">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Authorized Sender: <span className="text-foreground font-black truncate ml-auto max-w-[120px]">{profile?.full_name || profile?.email}</span>
+                </li>
               </ul>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowSendDialog(false)}>Cancel</Button>
-              <Button type="submit" disabled={sendingEmail} data-testid="send-email-btn">
-                {sendingEmail ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : <><Send className="w-4 h-4 mr-2" />Send Report</>}
+            <DialogFooter className="gap-3 pt-4">
+              <Button type="button" variant="ghost" className="rounded-xl font-bold h-11 px-6" onClick={() => setShowSendDialog(false)}>Cancel</Button>
+              <Button type="submit" className="rounded-2xl font-bold h-11 px-10 shadow-xl shadow-primary/20 flex-1" disabled={sendingEmail} data-testid="send-email-btn">
+                {sendingEmail ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Dispatching...</> : <><Send className="w-4 h-4 mr-2" />Dispatch Report</>}
               </Button>
             </DialogFooter>
           </form>
@@ -2023,7 +2937,7 @@ function PublicAssessPage({ token }) {
             </CardContent></Card>
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => currentPillar === 0 ? setPhase('screener') : setCurrentPillar(currentPillar - 1)}>Back</Button>
-              {currentPillar < DIAGNOSTIC_PILLARS.length - 1 ? <Button onClick={() => setCurrentPillar(currentPillar + 1)}>Next Pillar</Button> : <Button onClick={handleFinalSubmit} className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="w-4 h-4 mr-2" />Submit Assessment</Button>}
+              {currentPillar < DIAGNOSTIC_PILLARS.length - 1 ? <Button onClick={() => { setCurrentPillar(currentPillar + 1); document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' }) }}>Next Pillar</Button> : <Button onClick={handleFinalSubmit} className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="w-4 h-4 mr-2" />Submit Assessment</Button>}
             </div>
           </TabsContent>
         </Tabs>
