@@ -555,11 +555,8 @@ async function handleRoute(request, { params }) {
       if (user.profile.role !== 'admin') projectQuery = projectQuery.eq('consultant_id', user.profile.id)
       const { data: projects, count: totalProjects } = await projectQuery
       const { count: totalConsultants } = await supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'consultant')
-      const { data: assessments } = await supabaseAdmin.from('assessments').select('diagnostic_status, project_id')
-      const projectIds = user.profile.role === 'admin' ? null : projects?.map(p => p.id)
-      const relevantAssessments = projectIds ? assessments?.filter(a => projectIds.includes(a.project_id)) : assessments
-      const activeCount = relevantAssessments?.filter(a => a.diagnostic_status === 'in_progress').length || 0
-      const completedCount = relevantAssessments?.filter(a => a.diagnostic_status === 'completed').length || 0
+      const activeCount = projects?.filter(p => p.status === 'in_progress').length || 0
+      const completedCount = projects?.filter(p => p.status === 'completed').length || 0
       // Sector distribution
       const sectors = {}
       for (const p of (projects || [])) { sectors[p.industry] = (sectors[p.industry] || 0) + 1 }
