@@ -2356,43 +2356,6 @@ function ScoresPage({ id }) {
             </GlassCard>
           )}
 
-          <GlassCard className="p-8 border-zinc-200/50 dark:border-zinc-800/50">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold tracking-tight">Intelligence History</h3>
-              <Clock className="w-4 h-4 text-muted-foreground opacity-30" />
-            </div>
-            
-            <div className="space-y-4">
-              {trendData.length > 1 ? (
-                <div className="h-[180px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="8 8" stroke="currentColor" className="text-zinc-100 dark:text-zinc-800" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600 }} dy={10} className="text-muted-foreground" />
-                      <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600 }} className="text-muted-foreground" />
-                      <RechartsTooltip content={({ active, payload }) => active && payload?.length ? (
-                        <div className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 p-2 rounded-xl shadow-xl">
-                          <p className="text-[10px] font-black uppercase text-primary">{payload[0].name}: {payload[0].value}</p>
-                        </div>
-                      ) : null} />
-                      <Area type="monotone" dataKey="radScore" name="RAD Score" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="py-10 text-center space-y-3 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
-                  <ActivityIcon className="w-8 h-8 text-muted-foreground opacity-20 mx-auto" />
-                  <p className="text-xs text-muted-foreground font-medium italic">Baseline established. Subsequent assessments will generate trend intelligence.</p>
-                </div>
-              )}
-            </div>
-          </GlassCard>
         </div>
       </div>
 
