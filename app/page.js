@@ -156,25 +156,16 @@ function LoginPage({ onSuccess, onDemo }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[hsl(222,47%,5%)]">
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-        src="/Image_to_video_delpmaspu_.mp4"
-      />
-      <div className="absolute inset-0 bg-black/40" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative bg-white">
       <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
             <Zap className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Biz Ascend RAD&trade;</h1>
-          <p className="text-white/70">Revenue Acceleration Diagnostic Platform</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Biz Ascend RAD&trade;</h1>
+          <p className="text-gray-500">Revenue Acceleration Diagnostic Platform</p>
         </div>
-        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 backdrop-blur-md login-card">
+        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 login-card">
           <CardContent className="pt-6">
             <form onSubmit={handleLogin} className="space-y-4">
               {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">{error}</div>}
@@ -202,10 +193,10 @@ function LoginPage({ onSuccess, onDemo }) {
             </form>
           </CardContent>
         </Card>
-        <Button type="button" variant="outline" className="w-full h-11 border-white/30 text-white bg-transparent hover:bg-transparent hover:border-white/60" onClick={onDemo} data-testid="explore-demo-btn">
+        <Button type="button" variant="outline" className="w-full h-11 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={onDemo} data-testid="explore-demo-btn">
           <Eye className="w-4 h-4 mr-2" />Explore Demo
         </Button>
-        <p className="text-center text-sm text-white/70">Don&apos;t have an account?{' '}
+        <p className="text-center text-sm text-gray-500">Don&apos;t have an account?{' '}
           <a href="#/signup" className="text-primary hover:underline font-medium" data-testid="signup-link">Create account</a>
         </p>
       </div>
@@ -249,27 +240,18 @@ function ForgotPasswordPage({ onBack }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[hsl(222,47%,5%)]">
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-        src="/Image_to_video_delpmaspu_.mp4"
-      />
-      <div className="absolute inset-0 bg-black/40" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative bg-white">
       <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
             <Zap className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Reset Password</h1>
-          <p className="text-white/70">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Reset Password</h1>
+          <p className="text-gray-500">
             {sent ? "Check your inbox for the reset link" : "Enter your email to receive a reset link"}
           </p>
         </div>
-        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 backdrop-blur-md login-card">
+        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 login-card">
           <CardContent className="pt-6 space-y-6">
             {sent ? (
               <div className="space-y-4">
@@ -350,25 +332,16 @@ function SignupPage({ onSuccess, onDemo }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[hsl(222,47%,5%)]">
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-        src="/Image_to_video_delpmaspu_.mp4"
-      />
-      <div className="absolute inset-0 bg-black/40" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative bg-white">
       <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
             <Zap className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Create Account</h1>
-          <p className="text-white/70">Join Biz Ascend RAD&trade; Platform</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Create Account</h1>
+          <p className="text-gray-500">Join Biz Ascend RAD&trade; Platform</p>
         </div>
-        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 backdrop-blur-md login-card">
+        <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 login-card">
           <CardContent className="pt-6">
             <form onSubmit={handleSignup} className="space-y-4">
               {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">{error}</div>}
@@ -404,10 +377,10 @@ function SignupPage({ onSuccess, onDemo }) {
             </form>
           </CardContent>
         </Card>
-        <Button type="button" variant="outline" className="w-full h-11 border-white/30 text-white bg-transparent hover:bg-transparent hover:border-white/60" onClick={onDemo} data-testid="explore-demo-btn">
+        <Button type="button" variant="outline" className="w-full h-11 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={onDemo} data-testid="explore-demo-btn">
           <Eye className="w-4 h-4 mr-2" />Explore Demo
         </Button>
-        <p className="text-center text-sm text-white/70">Already have an account?{' '}
+        <p className="text-center text-sm text-gray-500">Already have an account?{' '}
           <a href="#/login" className="text-primary hover:underline font-medium" data-testid="login-link">Sign In</a>
         </p>
       </div>
