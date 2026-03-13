@@ -2234,11 +2234,13 @@ function ScoresPage({ id }) {
                   ? constraints.map(([pid]) => pillarLabel(pid))
                   : scores.primaryConstraint ? [scores.primaryConstraint.id ? pillarLabel(scores.primaryConstraint.id) : scores.primaryConstraint.name] : []
                 return names.length > 0 && (
-                  <div className="p-5 rounded-[2rem] bg-band-risk/5 border border-band-risk/10 backdrop-blur-sm">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-band-risk mb-1">{names.length > 1 ? 'Primary Constraints' : 'Primary Constraint'}</p>
+                  <div className="p-5 rounded-[2rem] bg-band-risk/5 border border-band-risk/10 backdrop-blur-sm text-left">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-band-risk mb-2">{names.length > 1 ? 'Primary Constraints' : 'Primary Constraint'}</p>
+                    <ul className="space-y-1">
                     {names.map((name, i) => (
-                      <p key={i} className="text-lg font-bold tracking-tight text-band-risk">{name}</p>
+                      <li key={i} className="text-lg font-bold tracking-tight text-band-risk flex items-start gap-2"><span className="mt-2.5 w-1.5 h-1.5 rounded-full bg-band-risk shrink-0" />{name}</li>
                     ))}
+                    </ul>
                   </div>
                 )
               })()}
@@ -2342,11 +2344,11 @@ function ScoresPage({ id }) {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-white/5 dark:bg-zinc-100 border border-white/10 dark:border-zinc-200">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1 text-primary">Target</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1 text-white">Target</p>
                     <p className="text-lg font-bold tabular-nums tracking-tight">${(scores.raps.revenueTarget || 0).toLocaleString()}</p>
                   </div>
                   <div className="p-4 rounded-2xl bg-white/5 dark:bg-zinc-100 border border-white/10 dark:border-zinc-200">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1 text-emerald-500">Invoiced</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1 text-white">Invoiced</p>
                     <p className="text-lg font-bold tabular-nums tracking-tight">${(scores.raps.revenueInvoiced || 0).toLocaleString()}</p>
                   </div>
                 </div>
