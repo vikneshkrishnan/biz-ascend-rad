@@ -76,7 +76,7 @@ export function ProjectsListPage() {
         <StatCard label="Total Portfolio" value={stats.total} icon={FolderKanban} color="text-primary" trend={5} />
 
         <StatCard label="Incomplete Assessments" value={stats.active} icon={ActivityIcon} color="text-blue-500" trend={2} />
-        <StatCard label="Completed Reports" value={stats.completed} icon={CheckCircle2} color="text-emerald-500" trend={8} />
+        <StatCard label="Completed" value={stats.completed} icon={CheckCircle2} color="text-emerald-500" trend={8} />
       </div>
 
       {/* Filter Bar */}
