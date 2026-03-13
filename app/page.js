@@ -157,11 +157,10 @@ function LoginPage({ onSuccess, onDemo }) {
     <div className="min-h-screen flex items-center justify-center p-4 relative bg-white">
       <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/25">
-            <Zap className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto">
+            <img src="/logo.jpeg" alt="Biz Ascend" className="h-16 object-contain mx-auto" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Biz Ascend RAD&trade;</h1>
-          <p className="text-gray-500">Revenue Acceleration Diagnostic Platform</p>
+          <p className="text-gray-500">Revenue Acceleration Diagnostic (RAD)</p>
         </div>
         <Card className="border border-gray-200 bg-white shadow-2xl shadow-black/20 login-card">
           <CardContent className="pt-6">

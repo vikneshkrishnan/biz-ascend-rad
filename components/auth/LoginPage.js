@@ -38,12 +38,11 @@ export function LoginPage({ onSuccess, onDemo }) {
     <div className="min-h-screen flex items-center justify-center p-4 relative bg-white">
       <Card className="w-full max-w-md border-2 relative z-10 bg-background">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Zap className="w-8 h-8 text-primary" />
+          <div className="mx-auto">
+            <img src="/logo.jpeg" alt="Biz Ascend" className="h-16 object-contain" />
           </div>
           <div>
-            <CardTitle className="text-2xl">Biz Ascend RAD™</CardTitle>
-            <CardDescription>Revenue Acceleration Diagnostic</CardDescription>
+            <CardDescription>Revenue Acceleration Diagnostic (RAD)</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
