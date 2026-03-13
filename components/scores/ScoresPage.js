@@ -345,7 +345,7 @@ export function ScoresPage({ id }) {
                         {pillarLabel(pid)}
                       </span>
                     </div>
-                    <span className="text-sm font-black tabular-nums">{data.score}</span>
+                    <span className="text-sm font-black tabular-nums">{data.score}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-full overflow-hidden">
                     <div className={cn("h-full rounded-full transition-all duration-1000 ease-out", bandColor(data.score))} style={{ width: `${data.score}%` }} />
