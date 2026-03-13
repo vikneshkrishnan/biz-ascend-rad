@@ -896,7 +896,7 @@ function ProjectsListPage() {
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <StatCard label="Total Portfolio" value={stats.total} icon={FolderKanban} color="text-primary" trend={5} />
-        <StatCard label="Active Diagnostics" value={stats.active} icon={ActivityIcon} color="text-blue-500" trend={2} />
+        <StatCard label="Incomplete Assessments" value={stats.active} icon={ActivityIcon} color="text-blue-500" trend={2} />
         <StatCard label="Completed Reports" value={stats.completed} icon={CheckCircle2} color="text-emerald-500" trend={8} />
       </div>
 
