@@ -32,7 +32,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Cell, AreaChart, Area, Tooltip as RechartsTooltip } from 'recharts'
 import { INDUSTRIES, SCREENER_SECTIONS, DIAGNOSTIC_PILLARS, MATURITY_BANDS, PILLAR_NAMES, FREE_EMAIL_DOMAINS, MONTHS } from '@/lib/constants'
 import { DEMO_PROFILE, DEMO_USERS, DEMO_PROJECTS, DEMO_STATS, DEMO_ACTIVITY, demoApiFetch } from '@/lib/mockData'
-import { cn } from '@/lib/utils'
+import { cn, getMaturityBand } from '@/lib/utils'
+import { generateClientPdf } from '@/lib/generatePdf'
+
+const pillarLabel = (pid) => `Pillar ${pid.replace('p', '')} - ${PILLAR_NAMES[pid] || pid}`
 import { GlassCard, StatCard, GlowEffect, StatusBadge as UIStatusBadge, PageSkeleton as UIPageSkeleton } from '@/components/shared/ui-helpers'
 
 // ===== DEMO MODE =====
@@ -65,10 +68,9 @@ function useAuth() { return useContext(AuthContext) }
 
 // ===== HASH ROUTER =====
 function useRouter() {
-  const [hash, setHash] = useState('')
+  const [hash, setHash] = useState(() => (typeof window !== 'undefined' ? window.location.hash.slice(1) : '') || '/login')
   useEffect(() => {
     const update = () => setHash(window.location.hash.slice(1) || '/login')
-    update()
     window.addEventListener('hashchange', update)
     return () => window.removeEventListener('hashchange', update)
   }, [])
@@ -1250,8 +1252,8 @@ function ProjectDetailPage({ id }) {
                 
                 <div className="flex-1 space-y-6 text-center md:text-left">
                   <div className="space-y-2">
-                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", scores.maturityBand?.includes('Strong') ? 'bg-emerald-500' : 'bg-amber-500')}>
-                      {scores.maturityBand?.toUpperCase()}
+                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-emerald-500' : getMaturityBand(scores.radScore).includes('Constrained') ? 'bg-lime-500' : getMaturityBand(scores.radScore).includes('Underpowered') ? 'bg-orange-600' : 'bg-rose-500')}>
+                      {getMaturityBand(scores.radScore).toUpperCase()}
                     </Badge>
                     <h2 className="text-3xl font-bold tracking-tight">Executive Summary Available</h2>
                     <p className="text-muted-foreground font-medium leading-relaxed">
@@ -2136,152 +2138,44 @@ function DiagnosticPage({ id }) {
 
 // ===== SCORES PAGE =====
 function ScoresPage({ id }) {
-  const { navigate, profile } = useAuth()
-  const queryClient = useQueryClient()
+  const { navigate } = useAuth()
   const { data: scores, isLoading: scoresLoading } = useQuery({ queryKey: ['scores', id], queryFn: () => apiFetch(`/projects/${id}/scores`) })
   const { data: project, isLoading: projectLoading } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
-  const [generating, setGenerating] = useState(false)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
-  const [showReport, setShowReport] = useState(false)
-  const [report, setReport] = useState(null)
-  const [showSendDialog, setShowSendDialog] = useState(false)
-  const [sendingEmail, setSendingEmail] = useState(false)
-  const [emailForm, setEmailForm] = useState({ email: '', message: '' })
-
-  async function generateReport() {
-    setGenerating(true)
-    try {
-      const result = await apiFetch(`/projects/${id}/report/generate`, { method: 'POST' })
-      setReport(result)
-      setShowReport(true)
-      toast.success('AI Intelligence Report Generated')
-      queryClient.invalidateQueries({ queryKey: ['report', id] })
-    } catch (err) {
-      toast.error(err.message || 'Failed to generate report')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  async function loadReport() {
-    try {
-      const result = await apiFetch(`/projects/${id}/report`)
-      setReport(result)
-      setShowReport(true)
-    } catch (err) {
-      toast.info('No finalized report found. Initiate generation to proceed.')
-    }
-  }
 
   async function downloadPdf() {
     setDownloadingPdf(true)
     try {
-      const result = await apiFetch(`/projects/${id}/report/pdf`)
-      const byteCharacters = atob(result.pdf)
-      const byteNumbers = new Array(byteCharacters.length)
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      let reportData = null
+      try {
+        reportData = await apiFetch(`/projects/${id}/report`)
+      } catch (e) {
+        // No report available — generate PDF with scores only
       }
-      const byteArray = new Uint8Array(byteNumbers)
-      const blob = new Blob([byteArray], { type: 'application/pdf' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = result.filename || `${project?.company_name || 'RAD'}_Executive_Report.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      generateClientPdf({
+        scores,
+        report: reportData,
+        project,
+        screenerResponses: reportData?.screener_responses || {},
+      })
       toast.success('Executive PDF Exported')
     } catch (err) {
-      toast.error('Export failed. Please generate the AI report first.')
+      toast.error('PDF export failed: ' + (err.message || 'Unknown error'))
     } finally {
       setDownloadingPdf(false)
-    }
-  }
-
-  function exportToCSV() {
-    if (!scores || !project) {
-      toast.error('No data available for export')
-      return
-    }
-
-    const companyName = project.company_name || 'Company'
-    const rows = []
-    rows.push(['Biz Ascend RAD - Diagnostic Export'])
-    rows.push(['Company', companyName])
-    rows.push(['Industry', project.industry || ''])
-    rows.push(['Export Date', new Date().toLocaleDateString()])
-    rows.push([])
-    rows.push(['=== OVERALL SCORES ==='])
-    rows.push(['RAD Score', scores.radScore])
-    rows.push(['Maturity Band', scores.maturityBand])
-    rows.push(['Primary Constraint', scores.primaryConstraint?.name || ''])
-    rows.push([])
-    rows.push(['=== PILLAR SCORES ==='])
-    rows.push(['Pillar', 'Score', 'Average', 'Status'])
-    Object.entries(scores.pillarScores || {}).forEach(([pid, data]) => {
-      const status = data.avg >= 4 ? 'Strong' : data.avg >= 3 ? 'Developing' : 'At Risk'
-      rows.push([PILLAR_NAMES[pid] || pid, data.score, data.avg?.toFixed(2), status])
-    })
-    
-    const csvContent = rows.map(row => row.map(cell => {
-      const str = String(cell ?? '')
-      return str.includes(',') || str.includes('"') || str.includes('\n') 
-        ? `"${str.replace(/"/g, '""')}"` 
-        : str
-    }).join(',')).join('\n')
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${companyName.replace(/\s+/g, '_')}_Intelligence_Data.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    toast.success('Intelligence Data Exported')
-  }
-
-  async function sendToClient(e) {
-    e.preventDefault()
-    if (!emailForm.email) {
-      toast.error('Recipient identity required')
-      return
-    }
-    setSendingEmail(true)
-    try {
-      if (_demoMode) {
-        await new Promise(r => setTimeout(r, 2000))
-        toast.success(`Executive Report dispatched to ${emailForm.email}`)
-        setShowSendDialog(false)
-        setEmailForm({ email: '', message: '' })
-      } else {
-        await apiFetch('/notifications/send-pdf-report', {
-          method: 'POST',
-          body: { project_id: id, recipient_email: emailForm.email, message: emailForm.message }
-        })
-        toast.success(`Executive Report dispatched to ${emailForm.email}`)
-        setShowSendDialog(false)
-        setEmailForm({ email: '', message: '' })
-      }
-    } catch (err) {
-      toast.error('Dispatch failed. System reported: ' + (err.message || 'Unknown error'))
-    } finally {
-      setSendingEmail(false)
     }
   }
 
   if (scoresLoading || projectLoading) return <UIPageSkeleton />
   if (!scores) return <div className="text-center py-24"><GlassCard className="p-12 max-w-md mx-auto"><AlertTriangle className="w-12 h-12 text-muted-foreground opacity-20 mx-auto mb-4" /><p className="text-muted-foreground font-medium">Intelligence data not finalized</p><Button variant="ghost" className="mt-4" onClick={() => navigate(`/projects/${id}`)}>Return to Project</Button></GlassCard></div>
 
-  const bandColor = scores.maturityBand?.includes('Strong') ? 'emerald' : scores.maturityBand?.includes('Developing') ? 'amber' : scores.maturityBand?.includes('Fragile') ? 'zinc' : 'rose'
+  const maturityBand = getMaturityBand(scores.radScore)
+  const bandClasses = maturityBand.includes('Strong') ? 'bg-emerald-500 shadow-emerald-500/20' : maturityBand.includes('Constrained') ? 'bg-lime-500 shadow-lime-500/20' : maturityBand.includes('Underpowered') ? 'bg-orange-600 shadow-orange-600/20' : 'bg-rose-500 shadow-rose-500/20'
   const trafficLight = (avg) => avg >= 4 ? 'bg-emerald-500' : avg >= 3 ? 'bg-amber-500' : 'bg-rose-500'
   
   const radarData = Object.entries(scores.pillarScores || {}).map(([pid, data]) => ({
     pillar: PILLAR_NAMES[pid]?.split(' ')[0] || pid,
-    fullName: PILLAR_NAMES[pid],
+    fullName: pillarLabel(pid),
     score: data.score,
     fullMark: 100
   }))
@@ -2307,24 +2201,10 @@ function ScoresPage({ id }) {
           <span className="text-primary font-black">Intelligence</span>
         </div>
         
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={exportToCSV}>
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            CSV Data
-          </Button>
-          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={() => setShowSendDialog(true)}>
-            <Mail className="w-4 h-4 mr-2" />
-            Send Report
-          </Button>
-          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={loadReport}>
-            <FileText className="w-4 h-4 mr-2" />
-            Final Report
-          </Button>
-          <Button className="rounded-2xl font-bold h-10 px-6 shadow-lg shadow-primary/20" onClick={generateReport} disabled={generating}>
-            {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
-            Generate AI Intelligence
-          </Button>
-        </div>
+        <Button className="rounded-2xl font-bold h-10 px-6 shadow-lg shadow-primary/20" onClick={downloadPdf} disabled={downloadingPdf}>
+          {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+          Generate Report
+        </Button>
       </div>
 
       <header className="space-y-1.5">
@@ -2349,14 +2229,14 @@ function ScoresPage({ id }) {
             </div>
             
             <div className="space-y-4">
-              <Badge className={cn("text-white font-black px-6 py-2 rounded-full text-sm tracking-wider shadow-lg", `bg-${bandColor}-500 shadow-${bandColor}-500/20`)}>
-                {scores.maturityBand?.toUpperCase()}
+              <Badge className={cn("text-white font-black px-6 py-2 rounded-full text-sm tracking-wider shadow-lg", bandClasses)}>
+                {maturityBand.toUpperCase()}
               </Badge>
               
               {scores.primaryConstraint && (
                 <div className="p-5 rounded-[2rem] bg-rose-500/5 border border-rose-500/10 backdrop-blur-sm">
                   <p className="text-[9px] font-black uppercase tracking-widest text-rose-500 mb-1">Primary Constraint</p>
-                  <p className="text-lg font-bold tracking-tight text-rose-600 dark:text-rose-400">{scores.primaryConstraint.name}</p>
+                  <p className="text-lg font-bold tracking-tight text-rose-600 dark:text-rose-400">{scores.primaryConstraint.id ? pillarLabel(scores.primaryConstraint.id) : scores.primaryConstraint.name}</p>
                 </div>
               )}
             </div>
@@ -2424,7 +2304,7 @@ function ScoresPage({ id }) {
                     <div className="flex items-center gap-3">
                       <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm", trafficLight(data.avg))} />
                       <span className={cn("text-sm font-bold tracking-tight", isPrimary ? "text-rose-600 dark:text-rose-400" : "text-zinc-700 dark:text-zinc-300")}>
-                        {PILLAR_NAMES[pid]}
+                        {pillarLabel(pid)}
                       </span>
                     </div>
                     <span className="text-sm font-black tabular-nums">{data.score}</span>
@@ -2513,277 +2393,6 @@ function ScoresPage({ id }) {
         </div>
       </div>
 
-      {/* AI Report Dialog */}
-      <Dialog open={showReport} onOpenChange={setShowReport}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] border-zinc-200 dark:border-zinc-800 p-0 shadow-2xl">
-          <div className="sticky top-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800 p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <FileText className="w-5 h-5 stroke-[2px]" />
-              </div>
-              <div>
-                <DialogTitle className="text-2xl font-bold tracking-tight">AI Intelligence Report</DialogTitle>
-                <DialogDescription className="font-medium text-xs uppercase tracking-widest text-primary/60 flex items-center gap-1.5">
-                  <Zap className="w-3 h-3" /> Engineered by Biz Ascend RAD™
-                </DialogDescription>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="rounded-xl border-zinc-200 dark:border-zinc-800 font-bold h-10" onClick={downloadPdf} disabled={downloadingPdf}>
-                {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                Export PDF
-              </Button>
-              <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10" onClick={() => setShowReport(false)}>
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
-
-          {report && (
-            <div className="p-8 space-y-12">
-              {/* Executive Summary Section */}
-              <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
-                  Executive Overview
-                </div>
-                <div className="p-8 rounded-[2.5rem] bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 shadow-inner relative overflow-hidden">
-                  <div className="relative z-10 text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 font-medium italic serif">
-                    &ldquo;{report.executive_summary}&rdquo;
-                  </div>
-                  <Award className="absolute -bottom-6 -right-6 w-32 h-32 text-primary opacity-[0.03] rotate-12" />
-                </div>
-              </section>
-
-              {/* Action Plan Section */}
-              {report.action_plan && (
-                <section className="space-y-6">
-                  <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
-                    Revenue Acceleration Roadmap
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                      { title: report.action_plan.phase1_title, items: report.action_plan.phase1_items, color: 'rose', icon: Clock },
-                      { title: report.action_plan.phase2_title, items: report.action_plan.phase2_items, color: 'amber', icon: Target },
-                      { title: report.action_plan.phase3_title, items: report.action_plan.phase3_items, color: 'emerald', icon: Zap },
-                    ].map((phase, i) => (
-                      <div key={i} className={cn(
-                        "p-6 rounded-[2rem] border relative overflow-hidden group transition-all duration-500 hover:-translate-y-1",
-                        `bg-${phase.color}-500/5 border-${phase.color}-500/10 hover:border-${phase.color}-500/30`
-                      )}>
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className={cn("font-black text-sm uppercase tracking-wider", `text-${phase.color}-600 dark:text-${phase.color}-400`)}>{phase.title}</h4>
-                          <phase.icon className={cn("w-4 h-4 opacity-40", `text-${phase.color}-500`)} />
-                        </div>
-                        <ul className="space-y-3">
-                          {(phase.items || []).map((item, ii) => (
-                            <li key={ii} className="text-sm font-medium flex items-start gap-2.5 text-zinc-700 dark:text-zinc-300">
-                              <span className={cn("w-1.5 h-1.5 rounded-full mt-1.5 shrink-0", `bg-${phase.color}-500`)} />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* RAPS Narrative */}
-              {report.raps_narrative && (
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
-                    Revenue Achievement Analysis
-                  </div>
-                  <GlassCard className="p-8 border-primary/5">
-                    <div className="flex flex-col md:flex-row gap-8">
-                      <div className="flex-1 space-y-4">
-                        <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap text-zinc-700 dark:text-zinc-300 italic">{report.raps_narrative}</p>
-                        {report.raps_improvement_scenario && (
-                          <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-sm font-bold text-emerald-600 dark:text-emerald-400 shadow-sm">
-                            Strategic Leverage: {report.raps_improvement_scenario}
-                          </div>
-                        )}
-                      </div>
-                      <div className="w-full md:w-48 flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-900 rounded-[2rem] border border-zinc-100 dark:border-zinc-800">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">RAPS Score</span>
-                        <span className="text-5xl font-black text-emerald-500 tabular-nums">{scores.raps?.score}%</span>
-                      </div>
-                    </div>
-                  </GlassCard>
-                </section>
-              )}
-
-              {/* Pillar Analysis */}
-              <section className="space-y-6">
-                <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
-                  Pillar Maturity Narratives
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {report.pillar_narratives && Object.entries(report.pillar_narratives).map(([pid, narrative], i) => {
-                    const isConstraint = scores.primaryConstraint?.id === pid
-                    return (
-                      <div key={pid} className={cn(
-                        "p-6 rounded-[2rem] border transition-all duration-500",
-                        isConstraint ? "bg-rose-500/5 border-rose-500/20" : "bg-white/40 dark:bg-zinc-950/40 border-zinc-100 dark:border-zinc-800"
-                      )}>
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className={cn("font-bold text-base tracking-tight", isConstraint ? "text-rose-600 dark:text-rose-400" : "text-primary")}>{PILLAR_NAMES[pid]}</h4>
-                          {isConstraint && <Badge variant="destructive" className="text-[8px] font-black uppercase px-2 py-0">Critical Constraint</Badge>}
-                        </div>
-                        <p className="text-sm text-muted-foreground font-medium leading-relaxed">{narrative}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-
-              {/* Market Intelligence */}
-              {report.market_report?.countries?.length > 0 && (
-                <section className="space-y-6">
-                  <div className="flex items-center gap-2 text-primary font-bold tracking-[0.2em] uppercase text-[10px]">
-                    Global Market Intelligence
-                  </div>
-                  <div className="space-y-6">
-                    {report.market_report.countries.map((country, ci) => (
-                      <div key={ci} className="group p-8 rounded-[2.5rem] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all duration-700 overflow-hidden relative">
-                        <div className="relative z-10 space-y-6">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-2xl font-bold tracking-tight">{country.name}</h4>
-                            <Badge className={cn(
-                              "font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg",
-                              country.growth_propensity === 'High' ? 'bg-emerald-500 shadow-emerald-500/20' : country.growth_propensity === 'Medium-High' ? 'bg-blue-500 shadow-blue-500/20' : 'bg-zinc-500 shadow-zinc-500/20'
-                            )}>
-                              {country.growth_propensity} Growth Potential
-                            </Badge>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {country.dimensions?.map((dim, di) => (
-                              <div key={di} className="space-y-2">
-                                <p className="text-xs font-black uppercase tracking-[0.15em] text-primary">{dim.name}</p>
-                                <ul className="space-y-1.5">
-                                  {(dim.findings || []).map((f, fi) => (
-                                    <li key={fi} className="text-sm font-medium text-zinc-600 dark:text-zinc-400 flex items-start gap-2">
-                                      <span className="text-primary mt-1 opacity-40 leading-none">›</span>
-                                      {f}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ))}
-                          </div>
-                          
-                          <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-1 sm:grid-cols-3 gap-6">
-                            <div className="space-y-1">
-                              <p className="text-[9px] font-black uppercase tracking-widest opacity-40">Primary Drivers</p>
-                              <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 leading-relaxed">{country.key_drivers}</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[9px] font-black uppercase tracking-widest opacity-40 text-rose-500">Risk Profile</p>
-                              <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 leading-relaxed">{country.risks}</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[9px] font-black uppercase tracking-widest opacity-40 text-emerald-500">Strategic Entry</p>
-                              <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 leading-relaxed">{country.strategic_implications}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full -mr-32 -mt-32 opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-              
-              <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 flex flex-col items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-primary rounded-lg flex items-center justify-center">
-                    <Zap className="w-3.5 h-3.5 text-white" />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Certified Intelligence Output</span>
-                </div>
-                <p className="text-[10px] font-bold text-muted-foreground/40 italic">Generated {report.generated_at ? new Date(report.generated_at).toLocaleString() : 'recently'}</p>
-              </div>
-            </div>
-          )}
-          
-          <div className="sticky bottom-0 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-200 dark:border-zinc-800 p-6 flex justify-between items-center">
-            <Button variant="ghost" className="rounded-xl font-bold h-11 px-6 text-muted-foreground hover:text-primary" onClick={() => setShowReport(false)}>
-              Close Intelligence Report
-            </Button>
-            <div className="flex gap-3">
-              <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-11 px-8" onClick={() => { setShowReport(false); setShowSendDialog(true) }}>
-                <Mail className="w-4 h-4 mr-2" />Dispatch to Principal
-              </Button>
-              <Button className="rounded-2xl font-bold h-11 px-10 shadow-xl shadow-primary/20" onClick={downloadPdf} disabled={downloadingPdf}>
-                {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Export Executive Brief
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Send to Client Dialog */}
-      <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
-        <DialogContent className="max-w-md rounded-[2.5rem] border-zinc-200 dark:border-zinc-800 p-8 shadow-2xl">
-          <DialogHeader className="mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-              <Send className="w-6 h-6" />
-            </div>
-            <DialogTitle className="text-2xl font-bold tracking-tight">Dispatch Report</DialogTitle>
-            <DialogDescription className="font-medium">Securely deliver the Intelligence Report to the organization principal.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={sendToClient} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="recipient-email" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Principal Identity (Email)</Label>
-              <Input 
-                id="recipient-email" 
-                type="email" 
-                value={emailForm.email} 
-                onChange={e => setEmailForm({...emailForm, email: e.target.value})}
-                placeholder="principal@organization.com"
-                required
-                className="h-12 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary font-medium"
-                data-testid="send-email-input"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email-message" className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Executive Commentary (Optional)</Label>
-              <Textarea 
-                id="email-message" 
-                value={emailForm.message} 
-                onChange={e => setEmailForm({...emailForm, message: e.target.value})}
-                placeholder="Provide strategic context for the principal..."
-                rows={4}
-                className="bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary font-medium resize-none p-4 leading-relaxed"
-              />
-            </div>
-            <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Security Encapsulated Data:</p>
-              <ul className="space-y-2">
-                <li className="flex items-center gap-3 text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  RAD Intelligence Score: <span className="text-primary font-black ml-auto">{scores?.radScore}</span>
-                </li>
-                <li className="flex items-center gap-3 text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Full Executive PDF attached
-                </li>
-                <li className="flex items-center gap-3 text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Authorized Sender: <span className="text-foreground font-black truncate ml-auto max-w-[120px]">{profile?.full_name || profile?.email}</span>
-                </li>
-              </ul>
-            </div>
-            <DialogFooter className="gap-3 pt-4">
-              <Button type="button" variant="ghost" className="rounded-xl font-bold h-11 px-6" onClick={() => setShowSendDialog(false)}>Cancel</Button>
-              <Button type="submit" className="rounded-2xl font-bold h-11 px-10 shadow-xl shadow-primary/20 flex-1" disabled={sendingEmail} data-testid="send-email-btn">
-                {sendingEmail ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Dispatching...</> : <><Send className="w-4 h-4 mr-2" />Dispatch Report</>}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
@@ -2988,7 +2597,8 @@ export default function App() {
         setUser(session.user)
         const profileData = await apiFetch('/auth/me')
         setProfile(profileData)
-        if (hash === '/login' || hash === '') navigate('/dashboard')
+        const currentHash = window.location.hash.slice(1)
+        if (currentHash === '/login' || currentHash === '' || !currentHash) navigate('/dashboard')
       } else {
         if (!hash.startsWith('/assess/') && !demoActive) navigate('/login')
       }

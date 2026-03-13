@@ -23,7 +23,10 @@ import {
   PolarRadiusAxis, Radar, AreaChart, Area
 } from 'recharts'
 import { PILLAR_NAMES } from '@/lib/constants'
-import { cn } from '@/lib/utils'
+import { cn, getMaturityBand } from '@/lib/utils'
+import { generateClientPdf } from '@/lib/generatePdf'
+
+const pillarLabel = (pid) => `Pillar ${pid.replace('p', '')} - ${PILLAR_NAMES[pid] || pid}`
 
 export function ScoresPage({ id }) {
   const { navigate, profile } = useAuth()
@@ -66,25 +69,24 @@ export function ScoresPage({ id }) {
   async function downloadPdf() {
     setDownloadingPdf(true)
     try {
-      const result = await apiFetch(`/projects/${id}/report/pdf`)
-      const byteCharacters = atob(result.pdf)
-      const byteNumbers = new Array(byteCharacters.length)
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      // Load report data if not already loaded
+      let reportData = report
+      if (!reportData) {
+        try {
+          reportData = await apiFetch(`/projects/${id}/report`)
+        } catch (e) {
+          // No report available — generate PDF with scores only
+        }
       }
-      const byteArray = new Uint8Array(byteNumbers)
-      const blob = new Blob([byteArray], { type: 'application/pdf' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = result.filename || `${project?.company_name || 'RAD'}_Executive_Report.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      generateClientPdf({
+        scores,
+        report: reportData,
+        project,
+        screenerResponses: reportData?.screener_responses || {},
+      })
       toast.success('Executive PDF Exported')
     } catch (err) {
-      toast.error('Export failed. Please generate the AI report first.')
+      toast.error('PDF export failed: ' + (err.message || 'Unknown error'))
     } finally {
       setDownloadingPdf(false)
     }
@@ -105,14 +107,14 @@ export function ScoresPage({ id }) {
     rows.push([])
     rows.push(['=== OVERALL SCORES ==='])
     rows.push(['RAD Score', scores.radScore])
-    rows.push(['Maturity Band', scores.maturityBand])
+    rows.push(['Maturity Band', getMaturityBand(scores.radScore)])
     rows.push(['Primary Constraint', scores.primaryConstraint?.name || ''])
     rows.push([])
     rows.push(['=== PILLAR SCORES ==='])
     rows.push(['Pillar', 'Score', 'Average', 'Status'])
     Object.entries(scores.pillarScores || {}).forEach(([pid, data]) => {
       const status = data.avg >= 4 ? 'Strong' : data.avg >= 3 ? 'Developing' : 'At Risk'
-      rows.push([PILLAR_NAMES[pid] || pid, data.score, data.avg?.toFixed(2), status])
+      rows.push([pillarLabel(pid), data.score, data.avg?.toFixed(2), status])
     })
     
     const csvContent = rows.map(row => row.map(cell => {
@@ -168,12 +170,13 @@ export function ScoresPage({ id }) {
   if (scoresLoading || projectLoading) return <PageSkeleton />
   if (!scores) return <div className="text-center py-24"><GlassCard className="p-12 max-w-md mx-auto"><AlertTriangle className="w-12 h-12 text-muted-foreground opacity-20 mx-auto mb-4" /><p className="text-muted-foreground font-medium">Intelligence data not finalized</p><Button variant="ghost" className="mt-4" onClick={() => navigate(`/projects/${id}`)}>Return to Project</Button></GlassCard></div>
 
-  const bandColor = scores.maturityBand?.includes('Strong') ? 'emerald' : scores.maturityBand?.includes('Constrained') ? 'lime' : scores.maturityBand?.includes('Underpowered') ? 'amber' : 'rose'
+  const maturityBand = getMaturityBand(scores.radScore)
+  const bandClasses = maturityBand.includes('Strong') ? 'bg-emerald-500 shadow-emerald-500/20' : maturityBand.includes('Constrained') ? 'bg-lime-500 shadow-lime-500/20' : maturityBand.includes('Underpowered') ? 'bg-orange-600 shadow-orange-600/20' : 'bg-rose-500 shadow-rose-500/20'
   const trafficLight = (avg) => avg >= 4 ? 'bg-emerald-500' : avg >= 3 ? 'bg-amber-500' : 'bg-rose-500'
   
   const radarData = Object.entries(scores.pillarScores || {}).map(([pid, data]) => ({
     pillar: PILLAR_NAMES[pid]?.split(' ')[0] || pid,
-    fullName: PILLAR_NAMES[pid],
+    fullName: pillarLabel(pid),
     score: data.score,
     fullMark: 100
   }))
@@ -199,24 +202,10 @@ export function ScoresPage({ id }) {
           <span className="text-primary font-black">Intelligence</span>
         </div>
         
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={exportToCSV}>
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            CSV Data
-          </Button>
-          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={() => setShowSendDialog(true)}>
-            <Mail className="w-4 h-4 mr-2" />
-            Send Report
-          </Button>
-          <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 font-bold h-10 px-4" onClick={loadReport}>
-            <FileText className="w-4 h-4 mr-2" />
-            Final Report
-          </Button>
-          <Button className="rounded-2xl font-bold h-10 px-6 shadow-lg shadow-primary/20" onClick={generateReport} disabled={generating}>
-            {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
-            Generate AI Intelligence
-          </Button>
-        </div>
+        <Button className="rounded-2xl font-bold h-10 px-6 shadow-lg shadow-primary/20" onClick={downloadPdf} disabled={downloadingPdf}>
+          {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+          Download Report
+        </Button>
       </div>
 
       <header className="space-y-1.5">
@@ -241,14 +230,14 @@ export function ScoresPage({ id }) {
             </div>
             
             <div className="space-y-4">
-              <Badge className={cn("text-white font-black px-6 py-2 rounded-full text-sm tracking-wider shadow-lg", `bg-${bandColor}-500 shadow-${bandColor}-500/20`)}>
-                {scores.maturityBand?.toUpperCase()}
+              <Badge className={cn("text-white font-black px-6 py-2 rounded-full text-sm tracking-wider shadow-lg", bandClasses)}>
+                {maturityBand.toUpperCase()}
               </Badge>
               
               {scores.primaryConstraint && (
                 <div className="p-5 rounded-[2rem] bg-rose-500/5 border border-rose-500/10 backdrop-blur-sm">
                   <p className="text-[9px] font-black uppercase tracking-widest text-rose-500 mb-1">Primary Constraint</p>
-                  <p className="text-lg font-bold tracking-tight text-rose-600 dark:text-rose-400">{scores.primaryConstraint.name}</p>
+                  <p className="text-lg font-bold tracking-tight text-rose-600 dark:text-rose-400">{scores.primaryConstraint.id ? pillarLabel(scores.primaryConstraint.id) : scores.primaryConstraint.name}</p>
                 </div>
               )}
             </div>
@@ -315,7 +304,7 @@ export function ScoresPage({ id }) {
                     <div className="flex items-center gap-3">
                       <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm", trafficLight(data.avg))} />
                       <span className={cn("text-sm font-bold tracking-tight", isPrimary ? "text-rose-600 dark:text-rose-400" : "text-zinc-700 dark:text-zinc-300")}>
-                        {PILLAR_NAMES[pid]}
+                        {pillarLabel(pid)}
                       </span>
                     </div>
                     <span className="text-sm font-black tabular-nums">{data.score}</span>

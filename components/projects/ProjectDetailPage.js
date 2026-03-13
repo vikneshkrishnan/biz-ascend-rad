@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { cn } from '@/lib/utils'
+import { cn, getMaturityBand } from '@/lib/utils'
 
 export function ProjectDetailPage({ id }) {
   const { navigate, profile } = useAuth()
@@ -170,8 +170,8 @@ export function ProjectDetailPage({ id }) {
                 
                 <div className="flex-1 space-y-6 text-center md:text-left">
                   <div className="space-y-2">
-                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", scores.maturityBand?.includes('Strong') ? 'bg-emerald-500' : 'bg-amber-500')}>
-                      {scores.maturityBand?.toUpperCase()}
+                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-emerald-500' : getMaturityBand(scores.radScore).includes('Constrained') ? 'bg-lime-500' : getMaturityBand(scores.radScore).includes('Underpowered') ? 'bg-orange-600' : 'bg-rose-500')}>
+                      {getMaturityBand(scores.radScore).toUpperCase()}
                     </Badge>
                     <h2 className="text-3xl font-bold tracking-tight">Executive Summary Available</h2>
                     <p className="text-muted-foreground font-medium leading-relaxed">
