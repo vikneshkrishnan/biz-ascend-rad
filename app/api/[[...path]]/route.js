@@ -282,7 +282,7 @@ async function handleRoute(request, { params }) {
       const assignTo = user.profile.role === 'admin' && consultant_id ? consultant_id : user.profile.id
       const projectId = uuidv4()
       const { data: project, error: e } = await supabaseAdmin.from('projects').insert({
-        id: projectId, company_name, industry, consultant_id: assignTo, status: 'draft'
+        id: projectId, company_name, industry, consultant_id: assignTo, status: 'in_progress'
       }).select('*, consultant:profiles!consultant_id(id, name, email)').single()
       if (e) throw e
       // Create first assessment
@@ -360,7 +360,7 @@ async function handleRoute(request, { params }) {
       if (assessment.screener_status === 'not_started') updates.screener_status = 'in_progress'
       const { data, error: e } = await supabaseAdmin.from('assessments').update(updates).eq('id', assessment.id).select().single()
       if (e) throw e
-      await supabaseAdmin.from('projects').update({ status: 'in_progress' }).eq('id', projectId).eq('status', 'draft')
+      await supabaseAdmin.from('projects').update({ status: 'in_progress' }).eq('id', projectId)
       return json({ success: true, status: data.screener_status })
     }
 

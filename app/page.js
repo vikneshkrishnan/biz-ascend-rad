@@ -110,16 +110,14 @@ const CARD_COLORS = [
 
 function StatusBadge({ status }) {
   const styles = {
-    draft: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
     in_progress: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
     completed: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
-    archived: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400',
     not_started: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
     active: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
     expired: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
   }
-  const labels = { draft: 'Draft', in_progress: 'In Progress', completed: 'Completed', archived: 'Archived', not_started: 'Not Started', active: 'Active', expired: 'Expired' }
-  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium uppercase ${styles[status] || styles.draft}`}>{labels[status] || status}</span>
+  const labels = { in_progress: 'In Progress', completed: 'Completed', not_started: 'Not Started', active: 'Active', expired: 'Expired' }
+  return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium uppercase ${styles[status] || styles.in_progress}`}>{labels[status] || status}</span>
 }
 
 function LoadingScreen() {
@@ -420,7 +418,7 @@ function AppShell({ children }) {
         <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shrink-0 shadow-sm">
           <Zap className="w-5 h-5 text-primary-foreground" />
         </div>
-        {(sidebarOpen || mobileOpen) && <span className="font-bold text-lg bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">RAD&trade;</span>}
+        {(sidebarOpen || mobileOpen) && <span className="font-bold text-lg bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Biz Ascend RAD&trade;</span>}
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map(item => (
@@ -507,7 +505,7 @@ function DashboardPage() {
   
   const statCards = isAdmin ? [
     { label: 'Total Projects', value: stats?.total_projects || 0, icon: FolderKanban, color: 'text-primary', trend: 12 },
-    { label: 'Active Diagnostics', value: stats?.active_diagnostics || 0, icon: ActivityIcon, color: 'text-blue-500', trend: -3 },
+    { label: 'Incomplete Assessments', value: stats?.active_diagnostics || 0, icon: ActivityIcon, color: 'text-blue-500', trend: -3 },
     { label: 'Completed', value: stats?.completed_diagnostics || 0, icon: CheckCircle2, color: 'text-emerald-500', trend: 8 },
     { label: 'Consultants', value: stats?.total_consultants || 0, icon: Building2, color: 'text-violet-500', trend: 5 },
   ] : [
@@ -518,7 +516,7 @@ function DashboardPage() {
   ]
 
   const sectorData = stats?.sectors ? Object.entries(stats.sectors).map(([name, value]) => ({ name, value })) : []
-  const COLORS = ['#000000', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#f59e0b']
+  const COLORS = ['#800000', '#990000', '#7a1a1a', '#660000', '#8b0000', '#a52a2a']
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -560,9 +558,7 @@ function DashboardPage() {
             Welcome, <span className="text-primary">{profile?.name?.split(' ')[0] || 'User'}</span>
           </h1>
           <p className="text-muted-foreground font-medium max-w-xl">
-            {isAdmin 
-              ? "Platform metrics are showing strong growth across all sectors." 
-              : "You're on track to complete your quarterly growth objectives."}
+            Platform metrics are showing strong growth across all sectors.
           </p>
         </div>
         
@@ -625,7 +621,7 @@ function DashboardPage() {
                     <GlassCard className="p-8 min-h-[400px]">
                       {sectorData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={320}>
-                          <BarChart data={sectorData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <BarChart data={sectorData} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
                             <defs>
                               {COLORS.map((color, i) => (
                                 <linearGradient key={`grad-${i}`} id={`barGrad-${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -635,12 +631,15 @@ function DashboardPage() {
                               ))}
                             </defs>
                             <CartesianGrid strokeDasharray="8 8" stroke="currentColor" className="text-zinc-200 dark:text-zinc-800" vertical={false} />
-                            <XAxis 
-                              dataKey="name" 
-                              axisLine={false} 
-                              tickLine={false} 
-                              tick={{ fill: 'currentColor', fontSize: 11, fontWeight: 600 }}
-                              dy={15}
+                            <XAxis
+                              dataKey="name"
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 600 }}
+                              angle={-25}
+                              textAnchor="end"
+                              dy={10}
+                              interval={0}
                               className="text-muted-foreground"
                             />
                             <YAxis 
@@ -921,10 +920,8 @@ function ProjectsListPage() {
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800">
                   <SelectItem value="all">All Pipeline</SelectItem>
-                  <SelectItem value="draft">Drafts</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1088,12 +1085,8 @@ function ProjectDetailPage({ id }) {
   const scores = assessment?.scores
 
   async function handleArchive() {
-    try {
-      await apiFetch(`/projects/${id}`, { method: 'PATCH', body: { status: 'archived' } })
-      queryClient.invalidateQueries({ queryKey: ['project', id] })
-      toast.success('Project archived')
-      setShowArchive(false)
-    } catch (err) { toast.error(err.message) }
+    // Archive functionality removed - only completed/in_progress statuses supported
+    setShowArchive(false)
   }
 
   async function generateLink() {
