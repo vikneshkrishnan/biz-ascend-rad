@@ -243,7 +243,7 @@ export function ScoresPage({ id }) {
           <LayoutDashboard className="w-3 h-3" />
           Revenue Acceleration Intelligence
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Strategic <span className="text-primary">Performance Analysis</span></h1>
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight">{project?.company_name && <span className="text-zinc-900 dark:text-zinc-50">{project.company_name} </span>}<span className="text-primary">Strategic Performance Analysis</span></h1>
         <p className="text-muted-foreground font-medium max-w-2xl leading-relaxed">
           Comprehensive diagnostic output for <span className="text-foreground font-bold">{project?.company_name}</span>. Review system maturity and primary constraints.
         </p>
@@ -256,7 +256,7 @@ export function ScoresPage({ id }) {
           <div className="relative z-10 space-y-6">
             <div className="space-y-1">
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">System Maturity Score</p>
-              <div className="text-8xl font-black tracking-tighter text-primary animate-in zoom-in duration-700">{scores.radScore}</div>
+              <div className="text-8xl font-black tracking-tighter text-primary animate-in zoom-in duration-700">{scores.radScore}%</div>
             </div>
             
             <div className="space-y-4">
