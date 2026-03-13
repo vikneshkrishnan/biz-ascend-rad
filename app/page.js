@@ -1252,12 +1252,12 @@ function ProjectDetailPage({ id }) {
                 
                 <div className="flex-1 space-y-6 text-center md:text-left">
                   <div className="space-y-2">
-                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-emerald-500' : getMaturityBand(scores.radScore).includes('Constrained') ? 'bg-lime-500' : getMaturityBand(scores.radScore).includes('Underpowered') ? 'bg-orange-600' : 'bg-rose-500')}>
+                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-band-strong' : getMaturityBand(scores.radScore).includes('Constrained') ? 'bg-band-constrained' : getMaturityBand(scores.radScore).includes('Underpowered') ? 'bg-band-underpowered' : 'bg-band-risk')}>
                       {getMaturityBand(scores.radScore).toUpperCase()}
                     </Badge>
                     <h2 className="text-3xl font-bold tracking-tight">Executive Summary Available</h2>
                     <p className="text-muted-foreground font-medium leading-relaxed">
-                      The diagnostic phase is complete. We've identified <span className="text-destructive font-bold">{scores.primaryConstraint?.name}</span> as the primary constraint holding back revenue growth.
+                      The diagnostic phase is complete. We've identified <span className="text-destructive font-bold">{Object.entries(scores.pillarScores || {}).filter(([, d]) => d.score < 50).map(([pid]) => PILLAR_NAMES[pid]).join(', ') || scores.primaryConstraint?.name}</span> as the primary constraint{Object.entries(scores.pillarScores || {}).filter(([, d]) => d.score < 50).length > 1 ? 's' : ''} holding back revenue growth.
                     </p>
                   </div>
                   <Button size="lg" className="rounded-2xl font-black px-10 h-14 shadow-2xl shadow-primary/20" onClick={() => navigate(`/projects/${id}/scores`)}>
@@ -2150,9 +2150,11 @@ function ScoresPage({ id }) {
       try {
         reportData = await apiFetch(`/projects/${id}/report`)
       } catch (e) {
-        // No report available — generate PDF with scores only
+        // No report exists yet — generate it via AI
+        toast.info('Generating AI Intelligence Report... this may take up to 60 seconds.')
+        reportData = await apiFetch(`/projects/${id}/report/generate`, { method: 'POST' })
       }
-      generateClientPdf({
+      await generateClientPdf({
         scores,
         report: reportData,
         project,
@@ -2160,7 +2162,7 @@ function ScoresPage({ id }) {
       })
       toast.success('Executive PDF Exported')
     } catch (err) {
-      toast.error('PDF export failed: ' + (err.message || 'Unknown error'))
+      toast.error('Report generation failed: ' + (err.message || 'Unknown error'))
     } finally {
       setDownloadingPdf(false)
     }
@@ -2170,11 +2172,38 @@ function ScoresPage({ id }) {
   if (!scores) return <div className="text-center py-24"><GlassCard className="p-12 max-w-md mx-auto"><AlertTriangle className="w-12 h-12 text-muted-foreground opacity-20 mx-auto mb-4" /><p className="text-muted-foreground font-medium">Intelligence data not finalized</p><Button variant="ghost" className="mt-4" onClick={() => navigate(`/projects/${id}`)}>Return to Project</Button></GlassCard></div>
 
   const maturityBand = getMaturityBand(scores.radScore)
-  const bandClasses = maturityBand.includes('Strong') ? 'bg-emerald-500 shadow-emerald-500/20' : maturityBand.includes('Constrained') ? 'bg-lime-500 shadow-lime-500/20' : maturityBand.includes('Underpowered') ? 'bg-orange-600 shadow-orange-600/20' : 'bg-rose-500 shadow-rose-500/20'
-  const trafficLight = (avg) => avg >= 4 ? 'bg-emerald-500' : avg >= 3 ? 'bg-amber-500' : 'bg-rose-500'
+  const bandClasses = maturityBand.includes('Strong') ? 'bg-band-strong shadow-band-strong/20' : maturityBand.includes('Constrained') ? 'bg-band-constrained shadow-band-constrained/20' : maturityBand.includes('Underpowered') ? 'bg-band-underpowered shadow-band-underpowered/20' : 'bg-band-risk shadow-band-risk/20'
+  const bandColor = (score) => score >= 80 ? 'bg-band-strong' : score >= 65 ? 'bg-band-constrained' : score >= 50 ? 'bg-band-underpowered' : 'bg-band-risk'
+
+  const CustomRadarTick = ({ payload, x, y, cx, cy, ...rest }) => {
+    const label = payload.value || ''
+    const words = label.split(' ')
+    const lines = []
+    let current = ''
+    for (const word of words) {
+      if (current && (current + ' ' + word).length > 18) {
+        lines.push(current)
+        current = word
+      } else {
+        current = current ? current + ' ' + word : word
+      }
+    }
+    if (current) lines.push(current)
+    const dx = x - cx
+    const dy = y - cy
+    const anchor = Math.abs(dx) < 5 ? 'middle' : dx > 0 ? 'start' : 'end'
+    const offsetY = dy < -5 ? -4 : dy > 5 ? 8 : 0
+    return (
+      <text x={x} y={y + offsetY} textAnchor={anchor} fill="currentColor" className="text-muted-foreground" fontSize={9} fontWeight={700}>
+        {lines.map((line, i) => (
+          <tspan key={i} x={x} dy={i === 0 ? 0 : 12}>{line}</tspan>
+        ))}
+      </text>
+    )
+  }
   
   const radarData = Object.entries(scores.pillarScores || {}).map(([pid, data]) => ({
-    pillar: PILLAR_NAMES[pid]?.split(' ')[0] || pid,
+    pillar: PILLAR_NAMES[pid] || pid,
     fullName: pillarLabel(pid),
     score: data.score,
     fullMark: 100
@@ -2233,12 +2262,20 @@ function ScoresPage({ id }) {
                 {maturityBand.toUpperCase()}
               </Badge>
               
-              {scores.primaryConstraint && (
-                <div className="p-5 rounded-[2rem] bg-rose-500/5 border border-rose-500/10 backdrop-blur-sm">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-rose-500 mb-1">Primary Constraint</p>
-                  <p className="text-lg font-bold tracking-tight text-rose-600 dark:text-rose-400">{scores.primaryConstraint.id ? pillarLabel(scores.primaryConstraint.id) : scores.primaryConstraint.name}</p>
-                </div>
-              )}
+              {(() => {
+                const constraints = Object.entries(scores.pillarScores || {}).filter(([, d]) => d.score < 50)
+                const names = constraints.length > 0
+                  ? constraints.map(([pid]) => pillarLabel(pid))
+                  : scores.primaryConstraint ? [scores.primaryConstraint.id ? pillarLabel(scores.primaryConstraint.id) : scores.primaryConstraint.name] : []
+                return names.length > 0 && (
+                  <div className="p-5 rounded-[2rem] bg-band-risk/5 border border-band-risk/10 backdrop-blur-sm">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-band-risk mb-1">{names.length > 1 ? 'Primary Constraints' : 'Primary Constraint'}</p>
+                    {names.map((name, i) => (
+                      <p key={i} className="text-lg font-bold tracking-tight text-band-risk">{name}</p>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           </div>
           
@@ -2256,17 +2293,17 @@ function ScoresPage({ id }) {
               <p className="text-xs text-muted-foreground font-medium">Performance across all growth dimensions</p>
             </div>
             <div className="flex gap-1.5">
-              {['emerald', 'amber', 'rose'].map((c) => (
-                <div key={c} className={cn("w-2 h-2 rounded-full", `bg-${c}-500`)} />
+              {['bg-band-strong', 'bg-band-constrained', 'bg-band-underpowered', 'bg-band-risk'].map((c) => (
+                <div key={c} className={cn("w-2 h-2 rounded-full", c)} />
               ))}
             </div>
           </div>
           
-          <div className="h-[320px]">
+          <div className="h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+              <RadarChart data={radarData} margin={{ top: 30, right: 80, bottom: 30, left: 80 }}>
                 <PolarGrid stroke="currentColor" className="text-zinc-200 dark:text-zinc-800" />
-                <PolarAngleAxis dataKey="pillar" tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 700 }} className="text-muted-foreground" />
+                <PolarAngleAxis dataKey="pillar" tick={<CustomRadarTick />} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                 <Radar name="Score" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} strokeWidth={3} />
                 <RechartsTooltip content={({ payload }) => payload?.[0] ? (
@@ -2294,23 +2331,23 @@ function ScoresPage({ id }) {
           
           <div className="space-y-4">
             {Object.entries(scores.pillarScores || {}).map(([pid, data]) => {
-              const isPrimary = scores.primaryConstraint?.id === pid
+              const isPrimary = data.score < 50
               return (
                 <div key={pid} className={cn(
                   "p-4 rounded-2xl border transition-all duration-500",
-                  isPrimary ? "bg-rose-500/5 border-rose-500/20 shadow-lg shadow-rose-500/5" : "bg-white/40 dark:bg-zinc-950/40 border-zinc-100 dark:border-zinc-800"
+                  isPrimary ? "bg-band-risk/5 border-band-risk/20 shadow-lg shadow-band-risk/5" : "bg-white/40 dark:bg-zinc-950/40 border-zinc-100 dark:border-zinc-800"
                 )}>
                   <div className="flex items-center justify-between mb-2.5">
                     <div className="flex items-center gap-3">
-                      <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm", trafficLight(data.avg))} />
-                      <span className={cn("text-sm font-bold tracking-tight", isPrimary ? "text-rose-600 dark:text-rose-400" : "text-zinc-700 dark:text-zinc-300")}>
+                      <div className={cn("w-2.5 h-2.5 rounded-full shadow-sm", bandColor(data.score))} />
+                      <span className={cn("text-sm font-bold tracking-tight", isPrimary ? "text-band-risk" : "text-zinc-700 dark:text-zinc-300")}>
                         {pillarLabel(pid)}
                       </span>
                     </div>
                     <span className="text-sm font-black tabular-nums">{data.score}</span>
                   </div>
                   <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-full overflow-hidden">
-                    <div className={cn("h-full rounded-full transition-all duration-1000 ease-out", trafficLight(data.avg))} style={{ width: `${data.score}%` }} />
+                    <div className={cn("h-full rounded-full transition-all duration-1000 ease-out", bandColor(data.score))} style={{ width: `${data.score}%` }} />
                   </div>
                 </div>
               )

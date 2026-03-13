@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import { generateDiagnosticReport, generateMarketReport } from '@/lib/reportAgent'
 
 const execPromise = promisify(exec)
 
@@ -622,10 +623,8 @@ async function handleRoute(request, { params }) {
       if (!assessment) return err('No assessment found', 404)
       if (assessment.diagnostic_status !== 'completed') return err('Diagnostic must be completed first', 400)
 
-      // Call Python script for AI generation
-      const scriptData = {
-        action: 'report',
-        api_key: process.env.EMERGENT_LLM_KEY,
+      // Generate report using Claude SDK
+      const reportInput = {
         project_id: projectId,
         scores: assessment.scores || calculateScores(assessment.diagnostic_responses, assessment.screener_responses),
         screener_responses: assessment.screener_responses,
@@ -633,28 +632,27 @@ async function handleRoute(request, { params }) {
       }
 
       try {
-        const reportData = await runPythonScript(scriptData)
+        const reportData = await generateDiagnosticReport(reportInput)
 
-        // Also generate market report
-        const marketData = {
-          action: 'market',
-          api_key: process.env.EMERGENT_LLM_KEY,
-          project_id: projectId,
-          markets: assessment.screener_responses?.q6 || 'United States',
-          industry: assessment.screener_responses?.q5 || 'Technology',
-          company: assessment.screener_responses?.q4 || 'the company',
-        }
+        // Also generate market report with web search
         let marketReport = { countries: [] }
-        try { marketReport = await runPythonScript(marketData) } catch (e) { console.error('Market report error:', e) }
+        try {
+          marketReport = await generateMarketReport({
+            project_id: projectId,
+            markets: assessment.screener_responses?.q6 || 'United States',
+            industry: assessment.screener_responses?.q5 || 'Technology',
+            company: assessment.screener_responses?.q4 || 'the company',
+          })
+        } catch (e) { console.error('Market report error:', e) }
 
         const fullReport = { ...reportData, market_report: marketReport, generated_at: new Date().toISOString() }
 
         await supabaseAdmin.from('assessments').update({ report_data: fullReport, report_generated_at: new Date().toISOString() }).eq('id', assessment.id)
         await logActivity(user.profile.id, projectId, 'Generated diagnostic report')
         return json(fullReport)
-      } catch (scriptErr) {
-        console.error('Report generation error:', scriptErr)
-        return err('Report generation failed: ' + scriptErr.message, 500)
+      } catch (reportErr) {
+        console.error('Report generation error:', reportErr)
+        return err('Report generation failed: ' + reportErr.message, 500)
       }
     }
 

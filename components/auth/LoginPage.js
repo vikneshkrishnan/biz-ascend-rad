@@ -35,17 +35,8 @@ export function LoginPage({ onSuccess, onDemo }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[hsl(222,47%,5%)]">
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-        src="/Image_to_video_delpmaspu_.mp4"
-      />
-      <div className="absolute inset-0 bg-black/40" />
-      <Card className="w-full max-w-md border-2 relative z-10 bg-background/80 backdrop-blur-md">
+    <div className="min-h-screen flex items-center justify-center p-4 relative bg-white">
+      <Card className="w-full max-w-md border-2 relative z-10 bg-background">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
             <Zap className="w-8 h-8 text-primary" />
@@ -117,17 +108,8 @@ export function ForgotPasswordPage({ onBack }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[hsl(222,47%,5%)]">
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-        src="/Image_to_video_delpmaspu_.mp4"
-      />
-      <div className="absolute inset-0 bg-black/40" />
-      <Card className="w-full max-w-md border-2 relative z-10 bg-background/80 backdrop-blur-md">
+    <div className="min-h-screen flex items-center justify-center p-4 relative bg-white">
+      <Card className="w-full max-w-md border-2 relative z-10 bg-background">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
             <Mail className="w-8 h-8 text-primary" />

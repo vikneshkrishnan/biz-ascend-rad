@@ -8,7 +8,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 PILLAR_NAMES = {
     'p1': 'Commercial Baseline', 'p2': 'ICP & Buyer Urgency',
     'p3': 'Positioning & Competitive Clarity', 'p4': 'Sales System Repeatability',
-    'p5': 'Pipeline Generation', 'p6': 'Revconomics', 'p7': 'Strategic Constraints',
+    'p5': 'Pipeline Generation', 'p6': 'Revenue Economics', 'p7': 'Strategic Constraints',
     'p8': 'Organisational Alignment & Capability', 'p9': 'Systems Readiness & AI Transformation',
 }
 
@@ -94,7 +94,7 @@ Return a JSON object with these exact keys. Each narrative should be 2-4 sentenc
     "p3": "narrative for Positioning & Competitive Clarity",
     "p4": "narrative for Sales System Repeatability",
     "p5": "narrative for Pipeline Generation",
-    "p6": "narrative for Revconomics",
+    "p6": "narrative for Revenue Economics",
     "p7": "narrative for Strategic Constraints",
     "p8": "narrative for Organisational Alignment & Capability",
     "p9": "narrative for Systems Readiness & AI Transformation"

@@ -8,6 +8,19 @@ module.exports = {
       './src/**/*.{js,jsx}',
     ],
     prefix: "",
+    safelist: [
+      'bg-band-strong', 'bg-band-constrained', 'bg-band-underpowered', 'bg-band-risk',
+      'shadow-band-strong/20', 'shadow-band-constrained/20', 'shadow-band-underpowered/20', 'shadow-band-risk/20',
+      'bg-band-risk/5', 'bg-band-risk/10', 'border-band-risk/10', 'border-band-risk/20', 'border-band-risk/30',
+      'text-band-risk', 'text-band-risk/60',
+      'bg-band-underpowered/5', 'bg-band-underpowered/10', 'border-band-underpowered/10', 'border-band-underpowered/30',
+      'text-band-underpowered',
+      'bg-band-constrained/5', 'bg-band-constrained/10', 'border-band-constrained/10', 'border-band-constrained/30',
+      'text-band-constrained',
+      'bg-band-strong/5', 'bg-band-strong/10', 'border-band-strong/10', 'border-band-strong/30',
+      'text-band-strong',
+      'shadow-band-risk/5', 'shadow-band-strong/5',
+    ],
     theme: {
     	container: {
     		center: true,
@@ -21,6 +34,12 @@ module.exports = {
                 sans: ['Arial', 'Helvetica', 'sans-serif'],
             },
     		colors: {
+    			band: {
+    				risk: '#DC3545',
+    				underpowered: '#FF8C00',
+    				constrained: '#32CD32',
+    				strong: '#28A745',
+    			},
     			border: 'hsl(var(--border))',
     			input: 'hsl(var(--input))',
     			ring: 'hsl(var(--ring))',

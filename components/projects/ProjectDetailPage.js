@@ -170,7 +170,7 @@ export function ProjectDetailPage({ id }) {
                 
                 <div className="flex-1 space-y-6 text-center md:text-left">
                   <div className="space-y-2">
-                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-emerald-500' : getMaturityBand(scores.radScore).includes('Constrained') ? 'bg-lime-500' : getMaturityBand(scores.radScore).includes('Underpowered') ? 'bg-orange-600' : 'bg-rose-500')}>
+                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-band-strong' : getMaturityBand(scores.radScore).includes('Constrained') ? 'bg-band-constrained' : getMaturityBand(scores.radScore).includes('Underpowered') ? 'bg-band-underpowered' : 'bg-band-risk')}>
                       {getMaturityBand(scores.radScore).toUpperCase()}
                     </Badge>
                     <h2 className="text-3xl font-bold tracking-tight">Executive Summary Available</h2>
