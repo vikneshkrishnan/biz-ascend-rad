@@ -21,6 +21,7 @@ export function ProjectDetailPage({ id }) {
   const queryClient = useQueryClient()
   const { data: project, isLoading } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
   const [showArchive, setShowArchive] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
   const [linkLoading, setLinkLoading] = useState(false)
 
   const generateLinkMutation = useMutation({
@@ -47,6 +48,15 @@ export function ProjectDetailPage({ id }) {
       queryClient.invalidateQueries({ queryKey: ['project', id] })
       toast.success('Project archived')
       setShowArchive(false)
+    } catch (err) { toast.error(err.message) }
+  }
+
+  async function handleDelete() {
+    try {
+      await apiFetch(`/projects/${id}`, { method: 'DELETE' })
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project deleted permanently')
+      navigate('/projects')
     } catch (err) { toast.error(err.message) }
   }
 
@@ -105,10 +115,16 @@ export function ProjectDetailPage({ id }) {
             </Button>
           )}
           {profile?.role === 'admin' && (
-            <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 text-destructive hover:bg-destructive/10 h-11" onClick={() => setShowArchive(true)}>
-              <Trash2 className="w-4 h-4 mr-2" />
-              Archive
-            </Button>
+            <>
+              <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 text-destructive hover:bg-destructive/10 h-11" onClick={() => setShowArchive(true)}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Archive
+              </Button>
+              <Button variant="destructive" className="rounded-2xl font-bold h-11 shadow-lg shadow-destructive/20" onClick={() => setShowDelete(true)}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </>
           )}
         </div>
       </header>
@@ -162,7 +178,7 @@ export function ProjectDetailPage({ id }) {
                       <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={440} strokeDashoffset={440 - (440 * scores.radScore) / 100} className="text-primary" strokeLinecap="round" />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-5xl font-black tracking-tighter text-primary">{scores.radScore}</span>
+                      <span className="text-5xl font-black tracking-tighter text-primary">{scores.radScore}%</span>
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">RAD Score</span>
                     </div>
                   </div>
@@ -175,7 +191,7 @@ export function ProjectDetailPage({ id }) {
                     </Badge>
                     <h2 className="text-3xl font-bold tracking-tight">Executive Summary Available</h2>
                     <p className="text-muted-foreground font-medium leading-relaxed">
-                      The diagnostic phase is complete. We've identified <span className="text-destructive font-bold">{scores.primaryConstraint?.name}</span> as the primary constraint holding back revenue growth.
+                      The diagnostic phase is complete. We've identified <span className="text-destructive font-bold">{scores.primaryConstraint?.name}%</span> as the primary constraint holding back revenue growth.
                     </p>
                   </div>
                   <Button size="lg" className="rounded-2xl font-black px-10 h-14 shadow-2xl shadow-primary/20" onClick={() => navigate(`/projects/${id}/scores`)}>
@@ -258,7 +274,7 @@ export function ProjectDetailPage({ id }) {
                       <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 group-hover:border-primary/20 transition-all duration-500">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-sm font-bold tracking-tight">{a.diagnostic_status === 'completed' ? 'Finalized' : 'In Progress'}</p>
-                          {a.scores?.radScore && <span className="text-lg font-black text-primary">{a.scores.radScore}</span>}
+                          {a.scores?.radScore && <span className="text-lg font-black text-primary">{a.scores.radScore}%</span>}
                         </div>
                         <StatusBadge status={a.diagnostic_status} />
                       </div>
@@ -301,6 +317,22 @@ export function ProjectDetailPage({ id }) {
           <DialogFooter className="gap-3 mt-6">
             <Button variant="outline" className="rounded-xl border-zinc-200 dark:border-zinc-800 font-bold px-6 h-11" onClick={() => setShowArchive(false)}>Cancel Action</Button>
             <Button variant="destructive" className="rounded-xl font-bold px-8 h-11 shadow-lg shadow-destructive/20" onClick={handleArchive}>Archive Now</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete dialog */}
+      <Dialog open={showDelete} onOpenChange={setShowDelete}>
+        <DialogContent className="rounded-[2rem] border-zinc-200 dark:border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tight">Delete Project Permanently?</DialogTitle>
+            <DialogDescription className="text-base font-medium">
+              This will permanently delete "{project.company_name}" and all associated assessments, scores, and reports. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-3 mt-6">
+            <Button variant="outline" className="rounded-xl border-zinc-200 dark:border-zinc-800 font-bold px-6 h-11" onClick={() => setShowDelete(false)}>Cancel</Button>
+            <Button variant="destructive" className="rounded-xl font-bold px-8 h-11 shadow-lg shadow-destructive/20" onClick={handleDelete}>Delete Permanently</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -70,4 +70,39 @@ test.describe('Projects List and Navigation', () => {
     // Verify scores page elements
     await expect(page.getByText('RAD Growth System Score')).toBeVisible();
   });
+
+  test('Admin can delete a project from detail page', async ({ page }) => {
+    await enterDemoMode(page);
+
+    // Navigate to projects
+    const projectsNav = page.locator('button', { hasText: 'Projects' });
+    await projectsNav.click();
+    await expect(page.locator('h1')).toContainText('Projects');
+
+    // Click on GreenWave Energy (draft project)
+    const projectCard = page.getByText('GreenWave Energy', { exact: false }).first();
+    await projectCard.click();
+
+    // Verify we're on the detail page
+    await expect(page.getByText('GreenWave Energy').first()).toBeVisible();
+
+    // Click Delete button
+    const deleteBtn = page.getByRole('button', { name: 'Delete' });
+    await expect(deleteBtn).toBeVisible();
+    await deleteBtn.click();
+
+    // Verify confirmation dialog appears
+    await expect(page.getByText('Delete Project Permanently?')).toBeVisible();
+    await expect(page.getByText('This will permanently delete')).toBeVisible();
+
+    // Confirm deletion
+    const confirmBtn = page.getByRole('button', { name: 'Delete Permanently' });
+    await confirmBtn.click();
+
+    // Should navigate back to projects list
+    await expect(page.locator('h1')).toContainText('Projects');
+
+    // Deleted project should no longer appear
+    await expect(page.getByText('GreenWave Energy')).not.toBeVisible();
+  });
 });

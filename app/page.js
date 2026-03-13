@@ -1210,7 +1210,7 @@ function ProjectDetailPage({ id }) {
                       <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={440} strokeDashoffset={440 - (440 * scores.radScore) / 100} className="text-primary" strokeLinecap="round" />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-5xl font-black tracking-tighter text-primary">{scores.radScore}</span>
+                      <span className="text-5xl font-black tracking-tighter text-primary">{scores.radScore}%</span>
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">RAD Score</span>
                     </div>
                   </div>
@@ -1306,7 +1306,7 @@ function ProjectDetailPage({ id }) {
                       <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 group-hover:border-primary/20 transition-all duration-500">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-sm font-bold tracking-tight">{a.diagnostic_status === 'completed' ? 'Finalized' : 'In Progress'}</p>
-                          {a.scores?.radScore && <span className="text-lg font-black text-primary">{a.scores.radScore}</span>}
+                          {a.scores?.radScore && <span className="text-lg font-black text-primary">{a.scores.radScore}%</span>}
                         </div>
                         <UIStatusBadge status={a.diagnostic_status} />
                       </div>
