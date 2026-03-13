@@ -2289,7 +2289,7 @@ function ScoresPage({ id }) {
         <GlassCard className="p-8 border-zinc-200/50 dark:border-zinc-800/50">
           <div className="flex items-center justify-between mb-8">
             <div className="space-y-1">
-              <h3 className="text-xl font-bold tracking-tight">System Components</h3>
+              <h3 className="text-xl font-bold tracking-tight">Pillar Scores</h3>
               <p className="text-xs text-muted-foreground font-medium">Granular maturity analysis</p>
             </div>
             <Target className="w-5 h-5 text-primary opacity-20" />
