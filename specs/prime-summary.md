@@ -1,6 +1,6 @@
 # 🧠 Prime Summary: Biz Ascend RAD™
 
-> Generated on: 2026-03-13
+> Generated on: 2026-03-17
 > Analyzer: Claude Code — Prime Command
 
 ---
@@ -58,7 +58,7 @@
 
 ```
 ├── app/
-│   ├── page.js              # Main SPA entry (~2000+ lines, hash router)
+│   ├── page.js              # Main SPA entry (~2600 lines, hash router)
 │   ├── layout.js             # Root layout
 │   ├── providers.js          # Theme + QueryClient providers
 │   ├── globals.css           # Tailwind + custom styles
@@ -94,8 +94,8 @@
 ## 5. Entry Points
 
 - **Main**: `app/page.js` — SPA with hash router, auth context, all page views
-- **Dev**: `npm run dev` (or `yarn dev`) — Next.js dev server on port 3000
-- **Build**: `npm run build` — Next.js production build
+- **Dev**: `yarn dev` — Next.js dev server on port 3000 (512MB heap limit)
+- **Build**: `yarn build` — Next.js production build
 - **Test**: Playwright (`tests/playwright.config.ts`)
 
 ## 6. API Surface
@@ -109,7 +109,7 @@ All endpoints handled in `app/api/[[...path]]/route.js`:
 | POST | /api/projects | Create project |
 | GET | /api/projects/:id | Project detail |
 | PATCH | /api/projects/:id | Update project |
-| DELETE | /api/projects/:id | Archive project |
+| DELETE | /api/projects/:id | Archive/delete project |
 | GET/PUT | /api/projects/:id/screener | Screener responses |
 | POST | /api/projects/:id/screener/submit | Submit screener |
 | GET/PUT | /api/projects/:id/diagnostic | Diagnostic responses |
@@ -161,6 +161,9 @@ All endpoints handled in `app/api/[[...path]]/route.js`:
 | `ANTHROPIC_API_KEY` | Claude AI API key |
 | `NEXT_PUBLIC_BASE_URL` | App base URL |
 | `CORS_ORIGINS` | Allowed CORS origins |
+| `RESEND_API_KEY` | Email service API key |
+| `SENDER_EMAIL` | Email sender address |
+| `EMERGENT_LLM_KEY` | Emergent platform AI key |
 
 ### Key Config Files
 | File | Purpose |
@@ -210,7 +213,7 @@ All endpoints handled in `app/api/[[...path]]/route.js`:
 
 ## 13. Deployment
 
-- **Platform**: Emergent Agent (preview URLs seen in PRD)
+- **Platform**: Emergent Agent (preview URLs)
 - **CI/CD**: Not detected (no `.github/workflows/`)
 - **Docker**: Not detected
 - **Emergent config**: `.emergent/emergent.yml`
@@ -229,7 +232,7 @@ All endpoints handled in `app/api/[[...path]]/route.js`:
 ## 15. Tech Debt & Issues
 
 - **TODOs/FIXMEs**: 0
-- **Monolithic `page.js`**: Main SPA file is very large (~2000+ lines), partial extraction to components done
+- **Monolithic `page.js`**: Main SPA file is ~2600 lines, partial extraction to components done
 - **Monolithic API route**: 843-line single file handles all endpoints — should be split
 - **No unit tests**: Only E2E tests via Playwright
 - **No CI/CD pipeline**: No GitHub Actions or similar detected
@@ -245,9 +248,7 @@ All endpoints handled in `app/api/[[...path]]/route.js`:
 | Build | `yarn build` |
 | Lint | Not configured |
 
-## 17. Gotchas & Notes
-
-- [2026-03-13] Chore: Delete Project — Added permanent delete button (admin-only) to project detail page with confirmation dialog, alongside existing archive feature.
+- [2026-03-17] Chore: Reset Password Page — Added `app/reset-password/page.js` so Supabase password reset links land on a working page where users can set a new password.
 
 ---
 

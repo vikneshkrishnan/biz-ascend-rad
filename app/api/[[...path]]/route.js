@@ -104,6 +104,13 @@ function json(data, status = 200) {
 
 function err(message, status = 400) { return json({ error: message }, status) }
 
+function getBaseUrl(request) {
+  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL
+  const proto = request.headers.get('x-forwarded-proto') || 'https'
+  const host = request.headers.get('host') || 'localhost:3000'
+  return `${proto}://${host}`
+}
+
 async function getUser(request) {
   const auth = request.headers.get('authorization')
   if (!auth?.startsWith('Bearer ')) return null
@@ -452,7 +459,7 @@ async function handleRoute(request, { params }) {
         project_id: projectId, assessment_id: assessment.id, token, status: 'active', expires_at: expires.toISOString()
       }).select().single()
       if (e) throw e
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
+      const baseUrl = getBaseUrl(request)
       await logActivity(user.profile.id, projectId, 'Generated questionnaire link')
       return json({ ...link, url: `${baseUrl}#/assess/${token}` })
     }
@@ -464,7 +471,7 @@ async function handleRoute(request, { params }) {
       const projectId = path[1]
       const { data: link } = await supabaseAdmin.from('questionnaire_links').select('*').eq('project_id', projectId).order('created_at', { ascending: false }).limit(1).single()
       if (!link) return json({ link: null })
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
+      const baseUrl = getBaseUrl(request)
       return json({ ...link, url: `${baseUrl}#/assess/${link.token}` })
     }
 
@@ -713,7 +720,7 @@ async function handleRoute(request, { params }) {
       
       if (!assessment?.scores) return err('No completed assessment found', 400)
 
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://biz-ascend-rad-1.preview.emergentagent.com'
+      const baseUrl = getBaseUrl(request)
       const reportUrl = `${baseUrl}#/projects/${project_id}/scores`
 
       const emailData = {
@@ -744,7 +751,7 @@ async function handleRoute(request, { params }) {
         return err('email is required', 400)
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://biz-ascend-rad-1.preview.emergentagent.com'
+      const baseUrl = getBaseUrl(request)
       // In real implementation, this would generate a secure token
       const resetUrl = `${baseUrl}#/reset-password?token=demo-token`
 
