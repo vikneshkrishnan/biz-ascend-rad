@@ -118,8 +118,19 @@ async function getUser(request) {
   try {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
     if (error || !user) return null
-    const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('auth_id', user.id).single()
-    if (!profile) return null
+    let { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('auth_id', user.id).single()
+    if (!profile) {
+      const meta = user.user_metadata || {}
+      const { data: newProfile, error: insertErr } = await supabaseAdmin.from('profiles').insert({
+        auth_id: user.id,
+        email: user.email,
+        name: meta.name || user.email.split('@')[0],
+        role: meta.role || 'consultant',
+        is_active: true,
+      }).select().single()
+      if (insertErr || !newProfile) return null
+      profile = newProfile
+    }
     return { ...user, profile }
   } catch { return null }
 }
