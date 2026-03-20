@@ -4,35 +4,11 @@ import { NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { generateDiagnosticReport, generateMarketReport } from '@/lib/reportAgent'
+import { calculateRAPS, calculateRAPSImprovement, parseCurrency, parseWinRate, parseSalesCycle, estimatePipelineFromLegacy } from '@/lib/rapsCalculation'
+import { validatePassword } from '@/lib/passwordValidation'
+import { PILLAR_WEIGHTS as DEFAULT_PILLAR_WEIGHTS, PILLAR_NAMES as PILLAR_NAME_MAP, FREE_EMAIL_DOMAINS } from '@/lib/constants'
 
 const execPromise = promisify(exec)
-
-// Helper function to run Python script for AI generation
-async function runPythonScript(data) {
-  const scriptPath = '/app/scripts/generate_report.py'
-  const inputJson = JSON.stringify(data)
-  
-  try {
-    const { stdout, stderr } = await execPromise(
-      `echo '${inputJson.replace(/'/g, "'\\''")}' | python3 ${scriptPath}`,
-      { 
-        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-        timeout: 120000, // 2 minute timeout
-        env: { ...process.env }
-      }
-    )
-    
-    if (stderr) {
-      console.error('Python stderr:', stderr)
-    }
-    
-    const result = JSON.parse(stdout.trim())
-    return result
-  } catch (error) {
-    console.error('Python script error:', error)
-    throw new Error(`Python script failed: ${error.message}`)
-  }
-}
 
 // Helper function to run PDF generation script
 async function runPdfScript(data) {
@@ -141,13 +117,31 @@ async function logActivity(userId, projectId, action, details = {}) {
   } catch (e) { console.error('Activity log error:', e) }
 }
 
+async function logAuthEvent(eventType, email, request, details = {}) {
+  try {
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const userAgent = request.headers.get('user-agent') || 'unknown'
+    let userId = null
+    if (details.user_id) {
+      const { data: profile } = await supabaseAdmin.from('profiles').select('id').eq('auth_id', details.user_id).single()
+      userId = profile?.id || null
+    }
+    await supabaseAdmin.from('auth_logs').insert({ email, user_id: userId, event_type: eventType, ip_address: ip, user_agent: userAgent, details })
+  } catch (e) { console.error('Auth log error:', e) }
+}
+
 // Scoring engine
-function calculateScores(diagnosticResponses, screenerResponses) {
-  const pillarWeights = { p1: 0.12, p2: 0.11, p3: 0.15, p4: 0.15, p5: 0.10, p6: 0.07, p7: 0.08, p8: 0.10, p9: 0.12 }
+function calculateScores(diagnosticResponses, screenerResponses, customWeights = null) {
+  const pillarWeights = customWeights || DEFAULT_PILLAR_WEIGHTS
   const pillarScores = {}
   let totalWeightedScore = 0
   let lowestPillar = { id: null, score: 101, name: '' }
-  const pillarNames = { p1: 'Commercial Baseline', p2: 'ICP & Buyer Urgency', p3: 'Positioning & Competitive Clarity', p4: 'Sales System Repeatability', p5: 'Pipeline Generation', p6: 'Revconomics', p7: 'Strategic Constraints', p8: 'Organisational Alignment & Capability', p9: 'Systems Readiness & AI Transformation' }
+  const pillarNames = PILLAR_NAME_MAP
+  const constraintCategories = {
+    p1: 'commercial_foundation', p2: 'market_targeting', p3: 'positioning_weakness',
+    p4: 'sales_system', p5: 'pipeline_constraint', p6: 'revenue_economics',
+    p7: 'strategic_constraint', p8: 'organizational_alignment', p9: 'systems_readiness'
+  }
 
   for (const [pillarId, weight] of Object.entries(pillarWeights)) {
     const responses = Object.entries(diagnosticResponses || {})
@@ -161,36 +155,58 @@ function calculateScores(diagnosticResponses, screenerResponses) {
     if (score < lowestPillar.score) lowestPillar = { id: pillarId, score, name: pillarNames[pillarId] }
   }
 
+  // Rank all constrained pillars (score < 65)
+  const constraints = Object.entries(pillarScores)
+    .filter(([, ps]) => ps.score > 0 && ps.score < 65)
+    .sort((a, b) => a[1].score - b[1].score)
+    .map(([pid, ps], idx) => ({
+      id: pid, name: pillarNames[pid], score: ps.score,
+      rank: idx + 1, category: constraintCategories[pid]
+    }))
+
+  // Growth leak detection - individual questions scoring 1 or 2
+  const growthLeaks = Object.entries(diagnosticResponses || {})
+    .filter(([, val]) => typeof val === 'number' && val <= 2)
+    .map(([key, val]) => {
+      const pillarId = key.split('_')[0]
+      return { questionId: key, score: val, pillar: pillarId, pillarName: pillarNames[pillarId] }
+    })
+    .sort((a, b) => a.score - b.score)
+
   const radScore = Math.round(totalWeightedScore * 10) / 10
   let maturityBand = 'Growth System At Risk'
   if (radScore >= 80) maturityBand = 'Growth Engine Strong'
   else if (radScore >= 65) maturityBand = 'Growth System Constrained'
   else if (radScore >= 50) maturityBand = 'Growth System Underpowered'
 
-  // RAPS calculation
+  // RAPS calculation using shared utility
   let raps = null
+  let rapsImprovement = null
   if (screenerResponses) {
-    const target = parseFloat(String(screenerResponses.q18 || '0').replace(/[,$]/g, '')) || 0
-    const invoiced = parseFloat(String(screenerResponses.q19 || '0').replace(/[,$]/g, '')) || 0
-    const remaining = Math.max(0, target - invoiced)
-    const fyEnd = parseInt(screenerResponses.q20) || 12
-    const now = new Date()
-    const curMonth = now.getMonth() + 1
-    let monthsLeft = fyEnd >= curMonth ? fyEnd - curMonth : 12 - curMonth + fyEnd
-    monthsLeft = Math.max(monthsLeft, 1)
-    const coverageMap = { '<1\u00d7 monthly revenue target': 0.5, '1\u20132\u00d7': 1.5, '2\u20133\u00d7': 2.5, '3\u20135\u00d7': 4, '5\u00d7+': 5 }
-    const winMap = { '<10%': 0.05, '10\u201320%': 0.15, '20\u201330%': 0.25, '30\u201340%': 0.35, '40%+': 0.45 }
-    const cycleMap = { '<1 month': 1, '1\u20133 months': 2, '3\u20136 months': 4.5, '6\u201312 months': 9, '12+ months': 15 }
-    const coverage = coverageMap[screenerResponses.q16] || 1
-    const winRate = winMap[screenerResponses.q17] || 0.2
-    const cycle = cycleMap[screenerResponses.q15] || 3
-    const timeFactor = Math.min(1, monthsLeft / cycle)
-    const base = Math.min(1, coverage * winRate * timeFactor)
-    const rapsScore = Math.round(Math.min(100, Math.max(0, base * (radScore / 100) * 100)))
-    raps = { score: rapsScore, revenueTarget: target, revenueInvoiced: invoiced, revenueRemaining: remaining, monthsRemaining: monthsLeft, pipelineCoverage: coverage, winRate, salesCycle: cycle, timeFactor, radModifier: radScore / 100 }
+    const target = parseCurrency(screenerResponses.q18)
+    const invoiced = parseCurrency(screenerResponses.q19)
+    const fyEndMonth = parseInt(screenerResponses.q20) || 12
+    const winRate = parseWinRate(screenerResponses.q17)
+    const salesCycle = parseSalesCycle(screenerResponses.q15)
+
+    // q16: currency value or legacy categorical fallback
+    let openPipeline = parseCurrency(screenerResponses.q16)
+    if (openPipeline === 0 && screenerResponses.q16) {
+      const legacy = estimatePipelineFromLegacy(screenerResponses.q16, target)
+      if (legacy !== null) openPipeline = legacy
+    }
+
+    const rapsInputs = { target, invoiced, fyEndMonth, openPipeline, winRate, salesCycle, radScore }
+    raps = calculateRAPS(rapsInputs)
+
+    // Deterministic improvement scenario: +5pp win rate, +25% pipeline
+    rapsImprovement = calculateRAPSImprovement(rapsInputs, {
+      winRate: Math.min(1, winRate + 0.05),
+      openPipeline: openPipeline * 1.25,
+    })
   }
 
-  return { radScore, maturityBand, primaryConstraint: lowestPillar, pillarScores, raps }
+  return { radScore, maturityBand, primaryConstraint: lowestPillar, constraints, growthLeaks, pillarScores, raps, rapsImprovement }
 }
 
 export async function OPTIONS() {
@@ -215,6 +231,58 @@ async function handleRoute(request, { params }) {
       return json(user.profile)
     }
 
+    // POST /auth/login-log - Log login success/failure from client
+    if (route === '/auth/login-log' && method === 'POST') {
+      const body = await request.json()
+      const { email, event_type, error_message } = body
+      if (!email || !event_type) return err('email and event_type required')
+      const validEvents = ['login_success', 'login_failure', 'signup', 'logout', 'password_reset_request', 'password_reset_complete']
+      if (!validEvents.includes(event_type)) return err('Invalid event_type')
+      await logAuthEvent(event_type, email, request, { error_message, user_id: body.user_id })
+      return json({ logged: true })
+    }
+
+    // GET /auth/logs - Admin can view auth logs
+    if (route === '/auth/logs' && method === 'GET') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      if (user.profile.role !== 'admin') return err('Forbidden', 403)
+      const url = new URL(request.url)
+      const limit = parseInt(url.searchParams.get('limit') || '50')
+      const { data, error: e } = await supabaseAdmin.from('auth_logs').select('*').order('created_at', { ascending: false }).limit(limit)
+      if (e) throw e
+      return json(data)
+    }
+
+    // GET /auth/session-timeout - Get configured session timeout
+    if (route === '/auth/session-timeout' && method === 'GET') {
+      const { data } = await supabaseAdmin.from('platform_settings').select('value').eq('key', 'session_timeout_minutes').single()
+      return json({ timeout_minutes: data?.value || 30 })
+    }
+
+    // ===== PLATFORM SETTINGS (Admin) =====
+    if (route === '/settings' && method === 'GET') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      if (user.profile.role !== 'admin') return err('Forbidden', 403)
+      const { data, error: e } = await supabaseAdmin.from('platform_settings').select('*').order('key')
+      if (e) throw e
+      return json(data)
+    }
+
+    if (route === '/settings' && method === 'PATCH') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      if (user.profile.role !== 'admin') return err('Forbidden', 403)
+      const body = await request.json()
+      const { key, value } = body
+      if (!key || value === undefined) return err('key and value required')
+      const { data, error: e } = await supabaseAdmin.from('platform_settings').upsert({ key, value: JSON.parse(JSON.stringify(value)), updated_by: user.profile.id, updated_at: new Date().toISOString() }, { onConflict: 'key' }).select().single()
+      if (e) throw e
+      await logActivity(user.profile.id, null, `Updated platform setting: ${key}`)
+      return json(data)
+    }
+
     // ===== USERS (Admin) =====
     if (route === '/users' && method === 'GET') {
       const user = await getUser(request)
@@ -232,6 +300,8 @@ async function handleRoute(request, { params }) {
       const body = await request.json()
       const { name, email, password, role = 'consultant' } = body
       if (!name || !email || !password) return err('Name, email, and password are required')
+      const pwCheck = validatePassword(password)
+      if (!pwCheck.valid) return err(`Password requirements: ${pwCheck.errors.join(', ')}`)
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email, password, email_confirm: true, user_metadata: { name, role }
       })
@@ -286,7 +356,22 @@ async function handleRoute(request, { params }) {
         for (const a of (assessments || [])) {
           if (!latestAssessments[a.project_id]) latestAssessments[a.project_id] = a
         }
-        for (const p of data) p.latest_assessment = latestAssessments[p.id] || null
+        for (const p of data) {
+          p.latest_assessment = latestAssessments[p.id] || null
+          // Compute real diagnostic progress
+          if (p.latest_assessment) {
+            const dr = p.latest_assessment.diagnostic_responses || {}
+            const answeredPillars = new Set()
+            for (const key of Object.keys(dr)) {
+              const match = key.match(/^(p\d+)_/)
+              if (match) answeredPillars.add(match[1])
+            }
+            const totalPillars = 9
+            p.diagnostic_progress = Math.round((answeredPillars.size / totalPillars) * 100)
+          } else {
+            p.diagnostic_progress = 0
+          }
+        }
       }
       return json(data)
     }
@@ -295,12 +380,12 @@ async function handleRoute(request, { params }) {
       const user = await getUser(request)
       if (!user) return err('Unauthorized', 401)
       const body = await request.json()
-      const { company_name, industry, consultant_id } = body
+      const { company_name, industry, consultant_id, contact_name, contact_email, notes } = body
       if (!company_name || !industry) return err('Company name and industry are required')
       const assignTo = user.profile.role === 'admin' && consultant_id ? consultant_id : user.profile.id
       const projectId = uuidv4()
       const { data: project, error: e } = await supabaseAdmin.from('projects').insert({
-        id: projectId, company_name, industry, consultant_id: assignTo, status: 'in_progress'
+        id: projectId, company_name, industry, consultant_id: assignTo, status: 'in_progress', contact_name, contact_email, notes
       }).select('*, consultant:profiles!consultant_id(id, name, email)').single()
       if (e) throw e
       // Create first assessment
@@ -332,12 +417,22 @@ async function handleRoute(request, { params }) {
       const user = await getUser(request)
       if (!user) return err('Unauthorized', 401)
       const projectId = path[1]
+      // Fetch current project to check archive status
+      const { data: currentProject, error: fetchErr } = await supabaseAdmin.from('projects').select('*').eq('id', projectId).single()
+      if (fetchErr || !currentProject) return err('Project not found', 404)
+      if (currentProject.is_archived === true && user.profile.role !== 'admin') return err('Archived projects are read-only', 403)
       const body = await request.json()
       const updates = {}
       if (body.company_name) updates.company_name = body.company_name
       if (body.industry) updates.industry = body.industry
       if (body.status) updates.status = body.status
       if (body.consultant_id && user.profile.role === 'admin') updates.consultant_id = body.consultant_id
+      if (body.contact_name !== undefined) updates.contact_name = body.contact_name
+      if (body.contact_email !== undefined) updates.contact_email = body.contact_email
+      if (body.notes !== undefined) updates.notes = body.notes
+      // Handle archive flag based on status transitions
+      if (body.status === 'archived') updates.is_archived = true
+      if (currentProject.is_archived === true && body.status && body.status !== 'archived') updates.is_archived = false
       const { data, error: e } = await supabaseAdmin.from('projects').update(updates).eq('id', projectId).select().single()
       if (e) throw e
       await logActivity(user.profile.id, projectId, `Updated project: ${data.company_name}`, updates)
@@ -442,7 +537,15 @@ async function handleRoute(request, { params }) {
       const user = await getUser(request)
       if (!user) return err('Unauthorized', 401)
       const projectId = path[1]
-      const { data: assessment } = await supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: false }).limit(1).single()
+      const scoresUrl = new URL(request.url)
+      const assessmentParam = scoresUrl.searchParams.get('assessment')
+      let assessmentQuery
+      if (assessmentParam) {
+        assessmentQuery = supabaseAdmin.from('assessments').select('*').eq('id', assessmentParam).eq('project_id', projectId).single()
+      } else {
+        assessmentQuery = supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: false }).limit(1).single()
+      }
+      const { data: assessment } = await assessmentQuery
       if (!assessment) return err('No assessment found', 404)
       if (assessment.scores) return json(assessment.scores)
       // Calculate if not cached
@@ -465,7 +568,10 @@ async function handleRoute(request, { params }) {
       // Expire existing links
       await supabaseAdmin.from('questionnaire_links').update({ status: 'expired' }).eq('project_id', projectId).eq('status', 'active')
       const token = uuidv4()
-      const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      // Load configurable link expiry (default 30 days)
+      const { data: expirySetting } = await supabaseAdmin.from('platform_settings').select('value').eq('key', 'link_expiry_days').single()
+      const expiryDays = expirySetting?.value || 30
+      const expires = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000)
       const { data: link, error: e } = await supabaseAdmin.from('questionnaire_links').insert({
         project_id: projectId, assessment_id: assessment.id, token, status: 'active', expires_at: expires.toISOString()
       }).select().single()
@@ -473,6 +579,48 @@ async function handleRoute(request, { params }) {
       const baseUrl = getBaseUrl(request)
       await logActivity(user.profile.id, projectId, 'Generated questionnaire link')
       return json({ ...link, url: `${baseUrl}#/assess/${token}` })
+    }
+
+    // POST /projects/:id/link/send-email - Send questionnaire link via email
+    if (path[0] === 'projects' && path.length === 4 && path[2] === 'link' && path[3] === 'send-email' && method === 'POST') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      const projectId = path[1]
+      const body = await request.json()
+      const { recipient_email, message } = body
+      if (!recipient_email) return err('recipient_email is required')
+
+      const { data: link } = await supabaseAdmin.from('questionnaire_links')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (!link) return err('No active questionnaire link found. Generate one first.', 404)
+
+      const baseUrl = getBaseUrl(request)
+      const linkUrl = `${baseUrl}#/assess/${link.token}`
+
+      const { data: project } = await supabaseAdmin.from('projects').select('company_name').eq('id', projectId).single()
+
+      const emailData = {
+        type: 'questionnaire_link',
+        to_email: recipient_email,
+        company_name: project?.company_name || 'Company',
+        link_url: linkUrl,
+        consultant_name: user.profile.name || user.profile.email,
+        message: message || '',
+        expires_at: link.expires_at
+      }
+
+      const result = await sendEmailNotification(emailData)
+      if (result.success) {
+        await logActivity(user.profile.id, projectId, `Sent questionnaire link to ${recipient_email}`)
+        return json({ success: true, message: `Questionnaire link sent to ${recipient_email}` })
+      } else {
+        return err(result.error || 'Failed to send email', 500)
+      }
     }
 
     // GET /projects/:id/link
@@ -503,6 +651,10 @@ async function handleRoute(request, { params }) {
       if (!link) return err('Invalid or expired link', 404)
       if (link.status === 'expired' || (link.expires_at && new Date(link.expires_at) < new Date())) return err('This link has expired', 410)
       if (link.status === 'completed') return json({ ...link, completed: true })
+      // Track link access
+      const accessUpdates = { last_accessed_at: new Date().toISOString(), access_count: (link.access_count || 0) + 1 }
+      if (!link.first_accessed_at) accessUpdates.first_accessed_at = new Date().toISOString()
+      await supabaseAdmin.from('questionnaire_links').update(accessUpdates).eq('id', link.id)
       return json({ token: link.token, status: link.status, progress: link.progress, project_name: link.project?.company_name, screener_responses: link.assessment?.screener_responses || {}, diagnostic_responses: link.assessment?.diagnostic_responses || {} })
     }
 
@@ -512,16 +664,21 @@ async function handleRoute(request, { params }) {
       const body = await request.json()
       const { data: link } = await supabaseAdmin.from('questionnaire_links').select('*').eq('token', token).single()
       if (!link || link.status !== 'active') return err('Invalid link', 400)
-      const updates = {}
+      if (link.expires_at && new Date(link.expires_at) < new Date()) return err('This link has expired', 410)
+      if (body.screener_responses && body.screener_responses.q3) {
+        const domain = body.screener_responses.q3.split('@')[1]?.toLowerCase()
+        if (domain && FREE_EMAIL_DOMAINS.includes(domain)) return err('Please use a company email address', 400)
+      }
       if (body.screener_responses) {
         await supabaseAdmin.from('assessments').update({ screener_responses: body.screener_responses, screener_status: 'in_progress' }).eq('id', link.assessment_id)
       }
       if (body.diagnostic_responses) {
         await supabaseAdmin.from('assessments').update({ diagnostic_responses: body.diagnostic_responses, diagnostic_status: 'in_progress' }).eq('id', link.assessment_id)
       }
-      if (body.progress) {
-        await supabaseAdmin.from('questionnaire_links').update({ progress: body.progress }).eq('id', link.id)
-      }
+      // Update progress and track access
+      const linkUpdates = { last_accessed_at: new Date().toISOString() }
+      if (body.progress) linkUpdates.progress = body.progress
+      await supabaseAdmin.from('questionnaire_links').update(linkUpdates).eq('id', link.id)
       return json({ success: true })
     }
 
@@ -530,6 +687,7 @@ async function handleRoute(request, { params }) {
       const token = path[1]
       const { data: link } = await supabaseAdmin.from('questionnaire_links').select('*').eq('token', token).single()
       if (!link || link.status !== 'active') return err('Invalid link', 400)
+      if (link.expires_at && new Date(link.expires_at) < new Date()) return err('This link has expired', 410)
       const { data: assessment } = await supabaseAdmin.from('assessments').select('*').eq('id', link.assessment_id).single()
       const scores = calculateScores(assessment.diagnostic_responses, assessment.screener_responses)
       await supabaseAdmin.from('assessments').update({ screener_status: 'completed', diagnostic_status: 'completed', scores, completed_at: new Date().toISOString() }).eq('id', link.assessment_id)
@@ -546,6 +704,39 @@ async function handleRoute(request, { params }) {
       const projectId = path[1]
       const { data } = await supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: true })
       return json(data || [])
+    }
+
+    // GET /projects/:id/scores/compare - Compare scores across assessments
+    if (path[0] === 'projects' && path.length === 4 && path[2] === 'scores' && path[3] === 'compare' && method === 'GET') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      const projectId = path[1]
+      const { data: assessments } = await supabaseAdmin.from('assessments')
+        .select('id, assessment_number, scores, completed_at')
+        .eq('project_id', projectId)
+        .not('scores', 'is', null)
+        .order('assessment_number', { ascending: true })
+      if (!assessments || assessments.length === 0) return err('No completed assessments found', 404)
+
+      const comparison = assessments.map((a, idx) => {
+        const prev = idx > 0 ? assessments[idx - 1] : null
+        const pillarDeltas = {}
+        if (prev && a.scores?.pillarScores && prev.scores?.pillarScores) {
+          for (const [pid, ps] of Object.entries(a.scores.pillarScores)) {
+            const prevScore = prev.scores.pillarScores[pid]?.score || 0
+            pillarDeltas[pid] = { current: ps.score, previous: prevScore, delta: Math.round((ps.score - prevScore) * 10) / 10 }
+          }
+        }
+        return {
+          assessment_number: a.assessment_number,
+          completed_at: a.completed_at,
+          radScore: a.scores?.radScore,
+          radDelta: prev ? Math.round((a.scores.radScore - (prev.scores?.radScore || 0)) * 10) / 10 : null,
+          maturityBand: a.scores?.maturityBand,
+          pillarDeltas,
+        }
+      })
+      return json(comparison)
     }
 
     // POST /projects/:id/reassess
@@ -579,6 +770,25 @@ async function handleRoute(request, { params }) {
       const sectors = {}
       for (const p of (projects || [])) { sectors[p.industry] = (sectors[p.industry] || 0) + 1 }
       return json({ total_projects: totalProjects || 0, total_consultants: totalConsultants || 0, active_diagnostics: activeCount, completed_diagnostics: completedCount, sectors })
+    }
+
+    // POST /admin/recalculate-scores/:projectId - Admin trigger to recalculate scores
+    if (path[0] === 'admin' && path[1] === 'recalculate-scores' && path.length === 3 && method === 'POST') {
+      const user = await getUser(request)
+      if (!user) return err('Unauthorized', 401)
+      if (user.profile.role !== 'admin') return err('Forbidden', 403)
+      const projectId = path[2]
+      const { data: assessment } = await supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: false }).limit(1).single()
+      if (!assessment) return err('No assessment found', 404)
+      if (assessment.diagnostic_status !== 'completed') return err('Diagnostic not yet completed', 400)
+      // Optionally load custom weights from platform_settings
+      let customWeights = null
+      const { data: weightsSetting } = await supabaseAdmin.from('platform_settings').select('value').eq('key', 'pillar_weights').single()
+      if (weightsSetting?.value) customWeights = weightsSetting.value
+      const scores = calculateScores(assessment.diagnostic_responses, assessment.screener_responses, customWeights)
+      await supabaseAdmin.from('assessments').update({ scores }).eq('id', assessment.id)
+      await logActivity(user.profile.id, projectId, 'Recalculated scores (admin)')
+      return json(scores)
     }
 
     // ===== ACTIVITY LOG =====
@@ -647,18 +857,16 @@ async function handleRoute(request, { params }) {
       }
 
       try {
-        const reportData = await generateDiagnosticReport(reportInput)
-
-        // Also generate market report with web search
-        let marketReport = { countries: [] }
-        try {
-          marketReport = await generateMarketReport({
+        // Run diagnostic and market reports in parallel
+        const [reportData, marketReport] = await Promise.all([
+          generateDiagnosticReport(reportInput),
+          generateMarketReport({
             project_id: projectId,
             markets: assessment.screener_responses?.q6 || 'United States',
             industry: assessment.screener_responses?.q5 || 'Technology',
             company: assessment.screener_responses?.q4 || 'the company',
-          })
-        } catch (e) { console.error('Market report error:', e) }
+          }).catch(e => { console.error('Market report error:', e); return { countries: [] } }),
+        ])
 
         const fullReport = { ...reportData, market_report: marketReport, generated_at: new Date().toISOString() }
 

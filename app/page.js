@@ -8,9 +8,9 @@ import {
   LayoutDashboard, FolderKanban, Users, LogOut, Sun, Moon, Zap, Plus, Search,
   ChevronRight, ArrowLeft, Activity as ActivityIcon, CheckCircle2, Clock, AlertTriangle, Copy,
   PanelLeftClose, PanelLeftOpen, MoreVertical, Building2, FileText, Link2,
-  TrendingUp, Shield, Trash2, Edit, BarChart3, Eye, EyeOff, ChevronLeft, Menu, X,
-  Target, Award, Gauge, RefreshCw, ExternalLink, Save, Loader2, Download, FileSpreadsheet, Mail, Send, Settings, Building,
-  ArrowUpRight, Bell, Briefcase
+  Shield, Trash2, Edit, BarChart3, Eye, EyeOff, ChevronLeft, Menu, X,
+  Target, RefreshCw, ExternalLink, Save, Loader2, Download, Send, Settings, Building,
+  ArrowUpRight, Briefcase
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,10 +30,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Cell, AreaChart, Area, Tooltip as RechartsTooltip } from 'recharts'
-import { INDUSTRIES, SCREENER_SECTIONS, DIAGNOSTIC_PILLARS, MATURITY_BANDS, PILLAR_NAMES, FREE_EMAIL_DOMAINS, MONTHS } from '@/lib/constants'
+import { INDUSTRIES, SCREENER_SECTIONS, DIAGNOSTIC_PILLARS, MATURITY_BANDS, PILLAR_NAMES, FREE_EMAIL_DOMAINS, MONTHS, QUESTIONNAIRE_BASE_URL } from '@/lib/constants'
 import { DEMO_PROFILE, DEMO_USERS, DEMO_PROJECTS, DEMO_STATS, DEMO_ACTIVITY, demoApiFetch } from '@/lib/mockData'
 import { cn, getMaturityBand } from '@/lib/utils'
 import { generateClientPdf } from '@/lib/generatePdf'
+import { validatePassword } from '@/lib/passwordValidation'
 
 const pillarLabel = (pid) => `Pillar ${pid.replace('p', '')} - ${PILLAR_NAMES[pid] || pid}`
 import { GlassCard, StatCard, GlowEffect, StatusBadge as UIStatusBadge, PageSkeleton as UIPageSkeleton } from '@/components/shared/ui-helpers'
@@ -60,6 +61,17 @@ async function apiFetch(path, options = {}) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Something went wrong')
   return data
+}
+
+// ===== AUTH EVENT LOGGING =====
+async function logAuthEvent(eventType, email, details = {}) {
+  try {
+    await fetch('/api/auth/login-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, event_type: eventType, ...details })
+    })
+  } catch (e) { /* silent */ }
 }
 
 // ===== AUTH CONTEXT =====
@@ -91,8 +103,8 @@ function matchRoute(hash) {
   if (scr) return { page: 'screener', id: scr[1] }
   const diag = hash.match(/^\/projects\/([^/]+)\/diagnostic$/)
   if (diag) return { page: 'diagnostic', id: diag[1] }
-  const scores = hash.match(/^\/projects\/([^/]+)\/scores$/)
-  if (scores) return { page: 'scores', id: scores[1] }
+  const scores = hash.match(/^\/projects\/([^/]+)\/scores(?:\?assessment=([^&]+))?$/)
+  if (scores) return { page: 'scores', id: scores[1], assessmentId: scores[2] || null }
   const assess = hash.match(/^\/assess\/([^/]+)$/)
   if (assess) return { page: 'public-assess', token: assess[1] }
   return { page: 'not-found' }
@@ -110,13 +122,15 @@ const CARD_COLORS = [
 
 function StatusBadge({ status }) {
   const styles = {
+    draft: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
     in_progress: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
     completed: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
     not_started: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
     active: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
     expired: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+    archived: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
   }
-  const labels = { in_progress: 'In Progress', completed: 'Completed', not_started: 'Not Started', active: 'Active', expired: 'Expired' }
+  const labels = { draft: 'Draft', in_progress: 'In Progress', completed: 'Completed', not_started: 'Not Started', active: 'Active', expired: 'Expired', archived: 'Archived' }
   return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium uppercase ${styles[status] || styles.in_progress}`}>{labels[status] || status}</span>
 }
 
@@ -142,11 +156,15 @@ function LoginPage({ onSuccess, onDemo }) {
     setLoading(true)
     setError('')
     try {
-      const { error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
       if (authErr) throw authErr
+      logAuthEvent('login_success', email, { user_id: data.user?.id })
       toast.success('Welcome back!')
       onSuccess()
-    } catch (err) { setError(err.message || 'Invalid credentials') } finally { setLoading(false) }
+    } catch (err) {
+      logAuthEvent('login_failure', email, { error_message: err.message })
+      setError(err.message || 'Invalid credentials')
+    } finally { setLoading(false) }
   }
 
   if (showForgotPassword) {
@@ -226,6 +244,7 @@ function ForgotPasswordPage({ onBack }) {
           redirectTo: `${window.location.origin}/reset-password`,
         })
         if (error) throw error
+        logAuthEvent('password_reset_request', email)
         setSent(true)
         toast.success('Reset link sent! Check your email.')
       }
@@ -274,6 +293,7 @@ function ForgotPasswordPage({ onBack }) {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="you@company.com"
+                    required
                     className="h-11 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary"
                     data-testid="forgot-email-input"
                   />
@@ -311,18 +331,20 @@ function SignupPage({ onSuccess, onDemo }) {
       setError('Passwords do not match')
       return
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+    const pwCheck = validatePassword(password)
+    if (!pwCheck.valid) {
+      setError('Password requirements: ' + pwCheck.errors.join(', '))
       return
     }
     setLoading(true)
     try {
-      const { error: authErr } = await supabase.auth.signUp({
+      const { data, error: authErr } = await supabase.auth.signUp({
         email,
         password,
         options: { data: { name, role: 'consultant' } }
       })
       if (authErr) throw authErr
+      logAuthEvent('signup', email, { user_id: data.user?.id })
       toast.success('Account created! Check your email to verify your account.', { description: 'A verification link has been sent to your inbox.', duration: 6000 })
       onSuccess()
     } catch (err) { setError(err.message || 'Signup failed') } finally { setLoading(false) }
@@ -353,7 +375,7 @@ function SignupPage({ onSuccess, onDemo }) {
               <div className="space-y-2">
                 <Label htmlFor="signup-password" className="text-gray-700 font-medium">Password</Label>
                 <div className="relative">
-                  <Input id="signup-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 characters" required className="h-11 pr-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="signup-password-input" />
+                  <Input id="signup-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 8 chars, upper, lower, number, symbol" required className="h-11 pr-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary" data-testid="signup-password-input" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" data-testid="signup-toggle-password">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -407,6 +429,8 @@ function AppShell({ children }) {
       window.location.reload()
       return
     }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user?.email) logAuthEvent('logout', session.user.email, { user_id: session.user.id })
     await supabase.auth.signOut()
     navigate('/login')
   }
@@ -562,14 +586,6 @@ function DashboardPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-2xl px-3 py-2 shadow-sm">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground pr-8">Search anything...</span>
-            <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border">⌘K</kbd>
-          </div>
-          <Button variant="outline" size="icon" className="rounded-2xl border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-zinc-900">
-            <Bell className="w-4 h-4" />
-          </Button>
           {!isAdmin && (
             <Button className="rounded-2xl shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all font-semibold px-6 h-11" onClick={() => navigate('/projects/new')}>
               <Plus className="w-4 h-4 mr-2" />
@@ -818,18 +834,6 @@ function DashboardPage() {
             </CardContent>
           </GlassCard>
 
-          <GlassCard className="p-6 bg-zinc-900 text-white border-none shadow-2xl">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-                <Settings className="w-6 h-6 text-white stroke-[2.5px]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold uppercase tracking-widest opacity-60">System Health</p>
-                <p className="font-bold tracking-tight">Optimal Performance</p>
-              </div>
-              <ArrowUpRight className="w-5 h-5 opacity-40" />
-            </div>
-          </GlassCard>
         </div>
       </div>
     </div>
@@ -843,22 +847,35 @@ function ProjectsListPage() {
   const { data: projects, isLoading: projectsLoading } = useQuery({ queryKey: ['projects'], queryFn: () => apiFetch('/projects') })
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [consultantFilter, setConsultantFilter] = useState('all')
+  const [dateRange, setDateRange] = useState('all')
+  const { data: consultants } = useQuery({ queryKey: ['users'], queryFn: () => apiFetch('/users'), enabled: profile?.role === 'admin' })
 
   const filtered = useMemo(() => {
     if (!projects) return []
     return projects.filter(p => {
       const matchSearch = p.company_name.toLowerCase().includes(search.toLowerCase()) || p.industry.toLowerCase().includes(search.toLowerCase())
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
-      return matchSearch && matchStatus
+      const matchConsultant = consultantFilter === 'all' || p.consultant_id === consultantFilter
+      let matchDate = true
+      if (dateRange !== 'all') {
+        const created = new Date(p.created_at)
+        const now = new Date()
+        if (dateRange === '7d') matchDate = (now - created) <= 7 * 86400000
+        else if (dateRange === '30d') matchDate = (now - created) <= 30 * 86400000
+        else if (dateRange === '90d') matchDate = (now - created) <= 90 * 86400000
+      }
+      return matchSearch && matchStatus && matchConsultant && matchDate
     })
-  }, [projects, search, statusFilter])
+  }, [projects, search, statusFilter, consultantFilter, dateRange])
 
   const stats = useMemo(() => {
-    if (!projects) return { total: 0, active: 0, completed: 0 }
+    if (!projects) return { total: 0, active: 0, completed: 0, draft: 0 }
     return {
       total: projects.length,
-      active: projects.filter(p => p.status === 'active' || p.status === 'in_progress').length,
-      completed: projects.filter(p => p.status === 'completed').length
+      active: projects.filter(p => p.status === 'in_progress').length,
+      completed: projects.filter(p => p.status === 'completed').length,
+      draft: projects.filter(p => p.status === 'draft').length
     }
   }, [projects])
 
@@ -919,8 +936,36 @@ function ProjectsListPage() {
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800">
                   <SelectItem value="all">All Pipeline</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {profile?.role === 'admin' && consultants && (
+              <div className="flex items-center gap-2 bg-white/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 h-12 shrink-0">
+                <Select value={consultantFilter} onValueChange={setConsultantFilter}>
+                  <SelectTrigger className="border-none bg-transparent focus:ring-0 h-auto p-0 min-w-[140px] font-semibold text-sm">
+                    <SelectValue placeholder="All Consultants" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800">
+                    <SelectItem value="all">All Consultants</SelectItem>
+                    {consultants.filter(c => c.is_active).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="flex items-center gap-2 bg-white/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 h-12 shrink-0">
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="border-none bg-transparent focus:ring-0 h-auto p-0 min-w-[100px] font-semibold text-sm">
+                  <SelectValue placeholder="All Time" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-zinc-200 dark:border-zinc-800">
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="7d">Last 7 Days</SelectItem>
+                  <SelectItem value="30d">Last 30 Days</SelectItem>
+                  <SelectItem value="90d">Last 90 Days</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -957,7 +1002,7 @@ function ProjectsListPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-[10px] font-bold text-muted-foreground tracking-tight uppercase">
                       <span>Diagnostic Progress</span>
-                      <span className="text-primary font-black">{project.status === 'completed' ? '100%' : '45%'}</span>
+                      <span className="text-primary font-black">{project.status === 'completed' ? '100%' : `${project.diagnostic_progress || 0}%`}</span>
                     </div>
                     <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-full overflow-hidden border border-zinc-200/20 dark:border-zinc-800/20">
                       <div 
@@ -965,7 +1010,7 @@ function ProjectsListPage() {
                           "h-full rounded-full transition-all duration-1000 ease-out",
                           project.status === 'completed' ? "bg-emerald-500" : "bg-primary animate-pulse shadow-[0_0_10px_rgba(var(--primary),0.3)]"
                         )}
-                        style={{ width: project.status === 'completed' ? '100%' : '45%' }}
+                        style={{ width: project.status === 'completed' ? '100%' : `${project.diagnostic_progress || 0}%` }}
                       />
                     </div>
                   </div>
@@ -1022,14 +1067,29 @@ function CreateProjectPage() {
   const [industry, setIndustry] = useState('')
   const [consultantId, setConsultantId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [contactName, setContactName] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
+  const [notes, setNotes] = useState('')
+  const [formErrors, setFormErrors] = useState({})
   const { data: consultants } = useQuery({ queryKey: ['users'], queryFn: () => apiFetch('/users'), enabled: profile?.role === 'admin' })
+
+  const isAdmin = profile?.role === 'admin'
+  const isFormComplete = companyName.trim() && industry && contactName.trim() && contactEmail.trim() && notes.trim() && (!isAdmin || consultantId)
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!companyName || !industry) { toast.error('Please fill all required fields'); return }
+    const errors = {}
+    if (!companyName.trim()) errors.companyName = 'Company name is required'
+    if (!industry) errors.industry = 'Industry is required'
+    if (!contactName.trim()) errors.contactName = 'Contact name is required'
+    if (!contactEmail.trim()) errors.contactEmail = 'Contact email is required'
+    if (!notes.trim()) errors.notes = 'Strategic notes are required'
+    if (isAdmin && !consultantId) errors.consultantId = 'Consultant is required'
+    if (Object.keys(errors).length > 0) { setFormErrors(errors); toast.error('Please fill all required fields'); return }
+    setFormErrors({})
     setSaving(true)
     try {
-      const body = { company_name: companyName, industry }
+      const body = { company_name: companyName, industry, contact_name: contactName, contact_email: contactEmail, notes }
       if (consultantId) body.consultant_id = consultantId
       const project = await apiFetch('/projects', { method: 'POST', body })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
@@ -1044,22 +1104,28 @@ function CreateProjectPage() {
       <div><h1 className="text-3xl font-bold tracking-tight">New Project</h1><p className="text-muted-foreground mt-1">Create a new client diagnostic project</p></div>
       <Card className="border-2"><CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2"><Label htmlFor="companyName">Company Name *</Label><Input id="companyName" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="e.g., Acme Corporation" required className="h-11" /></div>
+          <div className="space-y-2"><Label htmlFor="companyName">Company Name *</Label><Input id="companyName" value={companyName} onChange={e => { setCompanyName(e.target.value); setFormErrors(f => ({...f, companyName: ''})) }} placeholder="e.g., Acme Corporation" required className={`h-11 ${formErrors.companyName ? 'border-destructive' : ''}`} />{formErrors.companyName && <p className="text-xs text-destructive">{formErrors.companyName}</p>}</div>
           <div className="space-y-2"><Label>Industry / Sector *</Label>
-            <Select value={industry} onValueChange={setIndustry}><SelectTrigger className="h-11"><SelectValue placeholder="Select industry" /></SelectTrigger>
+            <Select value={industry} onValueChange={v => { setIndustry(v); setFormErrors(f => ({...f, industry: ''})) }}><SelectTrigger className={`h-11 ${formErrors.industry ? 'border-destructive' : ''}`}><SelectValue placeholder="Select industry" /></SelectTrigger>
               <SelectContent><ScrollArea className="h-[300px]">{INDUSTRIES.map(ind => <SelectItem key={ind} value={ind}>{ind}</SelectItem>)}</ScrollArea></SelectContent>
             </Select>
+            {formErrors.industry && <p className="text-xs text-destructive">{formErrors.industry}</p>}
           </div>
-          {profile?.role === 'admin' && consultants && (
-            <div className="space-y-2"><Label>Assign to Consultant</Label>
-              <Select value={consultantId} onValueChange={setConsultantId}><SelectTrigger className="h-11"><SelectValue placeholder="Select consultant" /></SelectTrigger>
+          {isAdmin && consultants && (
+            <div className="space-y-2"><Label>Assign to Consultant *</Label>
+              <Select value={consultantId} onValueChange={v => { setConsultantId(v); setFormErrors(f => ({...f, consultantId: ''})) }}><SelectTrigger className={`h-11 ${formErrors.consultantId ? 'border-destructive' : ''}`}><SelectValue placeholder="Select consultant" /></SelectTrigger>
                 <SelectContent>{consultants.filter(c => c.is_active).map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.email})</SelectItem>)}</SelectContent>
               </Select>
+              {formErrors.consultantId && <p className="text-xs text-destructive">{formErrors.consultantId}</p>}
             </div>
           )}
+          <Separator />
+          <div className="space-y-2"><Label htmlFor="contactName">Contact Name *</Label><Input id="contactName" value={contactName} onChange={e => { setContactName(e.target.value); setFormErrors(f => ({...f, contactName: ''})) }} placeholder="e.g., Jane Smith" required className={`h-11 ${formErrors.contactName ? 'border-destructive' : ''}`} />{formErrors.contactName && <p className="text-xs text-destructive">{formErrors.contactName}</p>}</div>
+          <div className="space-y-2"><Label htmlFor="contactEmail">Contact Email *</Label><Input id="contactEmail" type="email" value={contactEmail} onChange={e => { setContactEmail(e.target.value); setFormErrors(f => ({...f, contactEmail: ''})) }} placeholder="e.g., jane@company.com" required className={`h-11 ${formErrors.contactEmail ? 'border-destructive' : ''}`} />{formErrors.contactEmail && <p className="text-xs text-destructive">{formErrors.contactEmail}</p>}</div>
+          <div className="space-y-2"><Label htmlFor="notes">Strategic Notes *</Label><Textarea id="notes" value={notes} onChange={e => { setNotes(e.target.value); setFormErrors(f => ({...f, notes: ''})) }} placeholder="Key context or notes about this engagement..." rows={3} required className={formErrors.notes ? 'border-destructive' : ''} />{formErrors.notes && <p className="text-xs text-destructive">{formErrors.notes}</p>}</div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => navigate('/projects')} className="flex-1">Cancel</Button>
-            <Button type="submit" disabled={saving} className="flex-1">{saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : 'Create Project'}</Button>
+            <Button type="submit" disabled={saving || !isFormComplete} className="flex-1">{saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : 'Create Project'}</Button>
           </div>
         </form>
       </CardContent></Card>
@@ -1074,6 +1140,8 @@ function ProjectDetailPage({ id }) {
   const { data: project, isLoading } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
   const [showArchive, setShowArchive] = useState(false)
   const [linkLoading, setLinkLoading] = useState(false)
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState(null)
+  const { data: allUsers } = useQuery({ queryKey: ['users'], queryFn: () => apiFetch('/users'), enabled: profile?.role === 'admin' })
 
   if (isLoading) return <UIPageSkeleton />
   if (!project) return <div className="text-center py-24"><GlassCard className="p-12 max-w-md mx-auto"><AlertTriangle className="w-12 h-12 text-muted-foreground opacity-20 mx-auto mb-4" /><p className="text-muted-foreground font-medium">Project intelligence not found</p><Button variant="ghost" className="mt-4" onClick={() => navigate('/projects')}>Return to Portfolio</Button></GlassCard></div>
@@ -1082,9 +1150,16 @@ function ProjectDetailPage({ id }) {
   const screenerStatus = assessment?.screener_status || 'not_started'
   const diagnosticStatus = assessment?.diagnostic_status || 'not_started'
   const scores = assessment?.scores
+  const isArchived = project.status === 'archived' || project.is_archived
 
   async function handleArchive() {
-    // Archive functionality removed - only completed/in_progress statuses supported
+    try {
+      await apiFetch(`/projects/${id}`, { method: 'PATCH', body: { status: 'archived' } })
+      queryClient.invalidateQueries({ queryKey: ['project', id] })
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project archived')
+      navigate('/projects')
+    } catch (err) { toast.error(err.message) }
     setShowArchive(false)
   }
 
@@ -1098,7 +1173,7 @@ function ProjectDetailPage({ id }) {
   }
 
   async function copyLink() {
-    const url = project.questionnaire_link?.url || `${window.location.origin}#/assess/${project.questionnaire_link?.token}`
+    const url = `${QUESTIONNAIRE_BASE_URL}#/assess/${project.questionnaire_link?.token}`
     await navigator.clipboard.writeText(url)
     toast.success('Link copied to clipboard!')
   }
@@ -1133,6 +1208,7 @@ function ProjectDetailPage({ id }) {
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider">{project.industry}</Badge>
               <UIStatusBadge status={project.status} />
+              {isArchived && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 px-3 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider">Read Only</Badge>}
               {project.consultant && (
                 <div className="flex items-center gap-2 px-3 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-full">
                   <Avatar className="w-4 h-4">
@@ -1140,6 +1216,22 @@ function ProjectDetailPage({ id }) {
                   </Avatar>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">{project.consultant.name}</span>
                 </div>
+              )}
+              {profile?.role === 'admin' && !isArchived && allUsers && (
+                <Select value={project.consultant_id || ''} onValueChange={async (val) => {
+                  try {
+                    await apiFetch(`/projects/${id}`, { method: 'PATCH', body: { consultant_id: val } })
+                    queryClient.invalidateQueries({ queryKey: ['project', id] })
+                    toast.success('Consultant reassigned')
+                  } catch (err) { toast.error(err.message) }
+                }}>
+                  <SelectTrigger className="h-7 w-auto min-w-[140px] text-[10px] font-bold rounded-full border-zinc-200 dark:border-zinc-800 bg-transparent">
+                    <SelectValue placeholder="Reassign..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    {allUsers.filter(u => u.is_active && u.id !== project.consultant_id).map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>
@@ -1254,12 +1346,12 @@ function ProjectDetailPage({ id }) {
                   <>
                     <div className="relative group">
                       <div className="absolute inset-0 bg-primary/20 blur-[20px] rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <Input readOnly value={`${window.location.origin}#/assess/${project.questionnaire_link.token}`} className="relative bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-2xl font-mono text-xs h-12 w-full sm:w-[280px] pr-10" />
+                      <Input readOnly value={`${QUESTIONNAIRE_BASE_URL}#/assess/${project.questionnaire_link.token}`} className="relative bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-2xl font-mono text-xs h-12 w-full sm:w-[280px] pr-10" />
                       <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-10 w-10 text-primary" onClick={copyLink}>
                         <Copy className="w-4 h-4" />
                       </Button>
                     </div>
-                    <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 h-12 font-bold px-6" onClick={() => window.open(`#/assess/${project.questionnaire_link.token}`, '_blank')}>
+                    <Button variant="outline" className="rounded-2xl border-zinc-200 dark:border-zinc-800 h-12 font-bold px-6" onClick={() => window.open(`${QUESTIONNAIRE_BASE_URL}#/assess/${project.questionnaire_link.token}`, '_blank')}>
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Open Link
                     </Button>
@@ -1302,12 +1394,22 @@ function ProjectDetailPage({ id }) {
                         <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Cycle #{a.assessment_number}</span>
                         <span className="text-[10px] font-bold text-muted-foreground">{a.completed_at ? new Date(a.completed_at).toLocaleDateString() : 'Active'}</span>
                       </div>
-                      <div className="p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 group-hover:border-primary/20 transition-all duration-500">
+                      <div
+                      className={cn(
+                        "p-4 rounded-2xl border bg-zinc-50/50 dark:bg-zinc-900/50 transition-all duration-500 cursor-pointer",
+                        selectedAssessmentId === a.id ? "border-primary/40 bg-primary/5" : "border-zinc-100 dark:border-zinc-800 group-hover:border-primary/20"
+                      )}
+                      onClick={() => {
+                        setSelectedAssessmentId(a.id)
+                        if (a.diagnostic_status === 'completed') navigate(`/projects/${id}/scores?assessment=${a.id}`)
+                      }}
+                    >
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-sm font-bold tracking-tight">{a.diagnostic_status === 'completed' ? 'Finalized' : 'In Progress'}</p>
                           {a.scores?.radScore && <span className="text-lg font-black text-primary">{a.scores.radScore}%</span>}
                         </div>
                         <UIStatusBadge status={a.diagnostic_status} />
+                        {a.diagnostic_status === 'completed' && <p className="text-[10px] text-primary font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click to view scores →</p>}
                       </div>
                     </div>
                   </div>
@@ -1367,6 +1469,8 @@ function AdminUsersPage() {
   async function handleCreate(e) {
     e.preventDefault()
     if (!newUser.name || !newUser.email || !newUser.password) { toast.error('All fields are required'); return }
+    const pwCheck = validatePassword(newUser.password)
+    if (!pwCheck.valid) { toast.error('Password requirements: ' + pwCheck.errors.join(', ')); return }
     setCreating(true)
     try {
       await apiFetch('/users', { method: 'POST', body: newUser })
@@ -1610,6 +1714,12 @@ function OrganizationSettingsPage() {
 }
 
 // ===== SCREENER PAGE =====
+function isCompanyEmail(email) {
+  if (!email) return true
+  const domain = email.split('@')[1]?.toLowerCase()
+  return !domain || !FREE_EMAIL_DOMAINS.includes(domain)
+}
+
 function ScreenerPage({ id }) {
   const { navigate } = useAuth()
   const [responses, setResponses] = useState({})
@@ -1617,6 +1727,7 @@ function ScreenerPage({ id }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [emailError, setEmailError] = useState('')
   const saveTimeout = useRef(null)
 
   useEffect(() => {
@@ -1635,6 +1746,12 @@ function ScreenerPage({ id }) {
   }
 
   async function handleSubmit() {
+    const allRequired = SCREENER_SECTIONS.flatMap(s => s.questions).filter(q => q.required)
+    const missing = allRequired.filter(q => !responses[q.id] || (Array.isArray(responses[q.id]) && responses[q.id].length === 0))
+    if (missing.length > 0) {
+      toast.error(`Please complete all required fields (${missing.length} remaining): ${missing.map(q => q.label).join(', ')}`)
+      return
+    }
     await apiFetch(`/projects/${id}/screener`, { method: 'PUT', body: { responses } })
     await apiFetch(`/projects/${id}/screener/submit`, { method: 'POST' })
     toast.success('Strategic context captured successfully')
@@ -1644,6 +1761,12 @@ function ScreenerPage({ id }) {
   if (!loaded) return <UIPageSkeleton />
   const section = SCREENER_SECTIONS[currentSection]
   const progress = ((currentSection + 1) / SCREENER_SECTIONS.length) * 100
+  const sectionRequiredFields = section.questions.filter(q => q.required)
+  const isSectionComplete = sectionRequiredFields.every(q => {
+    const val = responses[q.id]
+    if (Array.isArray(val)) return val.length > 0
+    return val && String(val).trim() !== ''
+  })
 
   return (
     <div className="relative space-y-8 bg-transparent px-2 max-w-4xl mx-auto pb-20">
@@ -1731,7 +1854,17 @@ function ScreenerPage({ id }) {
 
                 <div className="relative">
                   {q.type === 'text' && <Input value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} className="h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm" />}
-                  {q.type === 'email' && <Input type="email" value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} className="h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm" />}
+                  {q.type === 'email' && <div>
+                    <Input type="email" value={responses[q.id] || ''} onChange={e => {
+                      updateResponse(q.id, e.target.value)
+                      if (q.companyEmail && !isCompanyEmail(e.target.value)) setEmailError('Please use a company email address')
+                      else setEmailError('')
+                    }} onBlur={e => {
+                      if (q.companyEmail && !isCompanyEmail(e.target.value)) setEmailError('Please use a company email address')
+                      else setEmailError('')
+                    }} className={`h-12 bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm ${q.companyEmail && emailError ? 'border-destructive' : ''}`} />
+                    {q.companyEmail && emailError && <p className="text-sm text-destructive mt-1">{emailError}</p>}
+                  </div>}
                   {q.type === 'textarea' && <Textarea value={responses[q.id] || ''} onChange={e => updateResponse(q.id, e.target.value)} placeholder={q.placeholder || 'Type here...'} rows={4} className="bg-white/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800 rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-300 shadow-sm resize-none" />}
                   
                   {q.type === 'radio' && (
@@ -1822,8 +1955,15 @@ function ScreenerPage({ id }) {
             </Button>
             
             {currentSection < SCREENER_SECTIONS.length - 1 ? (
-              <Button 
+              <Button
+                disabled={!isSectionComplete}
                 onClick={() => {
+                  const section = SCREENER_SECTIONS[currentSection]
+                  const companyEmailQ = section.questions.find(q => q.companyEmail)
+                  if (companyEmailQ && !isCompanyEmail(responses[companyEmailQ.id])) {
+                    setEmailError('Please use a company email address')
+                    return
+                  }
                   setCurrentSection(currentSection + 1)
                   document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
@@ -1833,8 +1973,14 @@ function ScreenerPage({ id }) {
                 <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
-              <Button 
-                onClick={handleSubmit} 
+              <Button
+                disabled={!isSectionComplete}
+                onClick={() => {
+                  const allCompanyEmailQs = SCREENER_SECTIONS.flatMap(s => s.questions).filter(q => q.companyEmail)
+                  const invalid = allCompanyEmailQs.find(q => !isCompanyEmail(responses[q.id]))
+                  if (invalid) { setEmailError('Please use a company email address'); toast.error('Please use a company email address'); return }
+                  handleSubmit()
+                }}
                 className="rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 px-10 shadow-xl shadow-emerald-500/20 order-1 sm:order-2"
               >
                 <CheckCircle2 className="w-4 h-4 mr-2" />
@@ -1883,6 +2029,20 @@ function DiagnosticPage({ id }) {
   }
 
   async function handleSubmit() {
+    const unansweredByPillar = DIAGNOSTIC_PILLARS.map((p, pi) => {
+      const missing = p.questions.filter(q => responses[q.id] === undefined || responses[q.id] === '')
+      return { pillar: p.name, pillarIndex: pi, questions: missing }
+    }).filter(p => p.questions.length > 0)
+    if (unansweredByPillar.length > 0) {
+      const totalMissing = unansweredByPillar.reduce((sum, p) => sum + p.questions.length, 0)
+      const details = unansweredByPillar.map(p =>
+        `${p.pillar}: ${p.questions.map(q => `"${getQuestionData(q).text}"`).join(', ')}`
+      ).join(' | ')
+      toast.error(`${totalMissing} unanswered question${totalMissing > 1 ? 's' : ''} — ${details}`, { duration: 8000 })
+      setCurrentPillar(unansweredByPillar[0].pillarIndex)
+      document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
     await apiFetch(`/projects/${id}/diagnostic`, { method: 'PUT', body: { responses } })
     await apiFetch(`/projects/${id}/diagnostic/submit`, { method: 'POST' })
     toast.success('Diagnostic intelligence finalized')
@@ -2102,9 +2262,10 @@ function DiagnosticPage({ id }) {
 }
 
 // ===== SCORES PAGE =====
-function ScoresPage({ id }) {
+function ScoresPage({ id, assessmentId }) {
   const { navigate } = useAuth()
-  const { data: scores, isLoading: scoresLoading } = useQuery({ queryKey: ['scores', id], queryFn: () => apiFetch(`/projects/${id}/scores`) })
+  const scoresUrl = assessmentId ? `/projects/${id}/scores?assessment=${assessmentId}` : `/projects/${id}/scores`
+  const { data: scores, isLoading: scoresLoading } = useQuery({ queryKey: ['scores', id, assessmentId], queryFn: () => apiFetch(scoresUrl) })
   const { data: project, isLoading: projectLoading } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
   const [downloadingPdf, setDownloadingPdf] = useState(false)
 
@@ -2376,6 +2537,7 @@ function PublicAssessPage({ token }) {
   const [currentPillar, setCurrentPillar] = useState(0)
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [emailError, setEmailError] = useState('')
   const saveTimeout = useRef(null)
 
   useEffect(() => {
@@ -2432,6 +2594,21 @@ function PublicAssessPage({ token }) {
   }
 
   async function handleFinalSubmit() {
+    // Validate required screener fields
+    const allRequired = SCREENER_SECTIONS.flatMap(s => s.questions).filter(q => q.required)
+    const missingScreener = allRequired.filter(q => !screenerResponses[q.id] || (Array.isArray(screenerResponses[q.id]) && screenerResponses[q.id].length === 0))
+    if (missingScreener.length > 0) {
+      toast.error(`Please complete all required screener fields (${missingScreener.length} remaining)`)
+      setPhase('screener')
+      return
+    }
+    // Validate all diagnostic questions answered
+    const allDiagnosticQs = DIAGNOSTIC_PILLARS.flatMap(p => p.questions)
+    const missingDiagnostic = allDiagnosticQs.filter(q => diagnosticResponses[q.id] === undefined || diagnosticResponses[q.id] === '')
+    if (missingDiagnostic.length > 0) {
+      toast.error(`Please answer all diagnostic questions (${missingDiagnostic.length} remaining)`)
+      return
+    }
     // Demo mode submission
     if (token.startsWith('demo-token')) {
       await new Promise(r => setTimeout(r, 1000))
@@ -2476,7 +2653,17 @@ function PublicAssessPage({ token }) {
                 <div key={q.id} className="space-y-2">
                   <Label className="text-base">{q.label} {q.required && <span className="text-destructive">*</span>}</Label>
                   {q.type === 'text' && <Input value={screenerResponses[q.id] || ''} onChange={e => updateScreener(q.id, e.target.value)} />}
-                  {q.type === 'email' && <Input type="email" value={screenerResponses[q.id] || ''} onChange={e => updateScreener(q.id, e.target.value)} />}
+                  {q.type === 'email' && <div>
+                    <Input type="email" value={screenerResponses[q.id] || ''} onChange={e => {
+                      updateScreener(q.id, e.target.value)
+                      if (q.companyEmail && !isCompanyEmail(e.target.value)) setEmailError('Please use a company email address')
+                      else setEmailError('')
+                    }} onBlur={e => {
+                      if (q.companyEmail && !isCompanyEmail(e.target.value)) setEmailError('Please use a company email address')
+                      else setEmailError('')
+                    }} className={q.companyEmail && emailError ? 'border-destructive' : ''} />
+                    {q.companyEmail && emailError && <p className="text-sm text-destructive mt-1">{emailError}</p>}
+                  </div>}
                   {q.type === 'textarea' && <Textarea value={screenerResponses[q.id] || ''} onChange={e => updateScreener(q.id, e.target.value)} placeholder={q.placeholder} rows={3} />}
                   {q.type === 'radio' && <RadioGroup value={screenerResponses[q.id] || ''} onValueChange={v => updateScreener(q.id, v)}>{q.options.map(o => <div key={o} className="flex items-center space-x-2 p-3 rounded-lg border hover:bg-muted/50"><RadioGroupItem value={o} id={`pub-${q.id}-${o}`} /><Label htmlFor={`pub-${q.id}-${o}`} className="flex-1 cursor-pointer text-sm">{o}</Label></div>)}</RadioGroup>}
                   {q.type === 'select' && <Select value={screenerResponses[q.id] || ''} onValueChange={v => updateScreener(q.id, v)}><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger><SelectContent><ScrollArea className="h-[250px]">{(q.options === 'INDUSTRIES' ? INDUSTRIES : q.options === 'MONTHS' ? MONTHS : q.options || []).map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</ScrollArea></SelectContent></Select>}
@@ -2488,7 +2675,20 @@ function PublicAssessPage({ token }) {
             </CardContent></Card>
             <div className="flex justify-between">
               <Button variant="outline" disabled={currentSection === 0} onClick={() => setCurrentSection(currentSection - 1)}>Back</Button>
-              {currentSection < SCREENER_SECTIONS.length - 1 ? <Button onClick={() => setCurrentSection(currentSection + 1)}>Next</Button> : <Button onClick={() => { setPhase('diagnostic'); setCurrentPillar(0) }}>Continue to Diagnostic</Button>}
+              {currentSection < SCREENER_SECTIONS.length - 1 ? <Button onClick={() => {
+                const section = SCREENER_SECTIONS[currentSection]
+                const companyEmailQ = section.questions.find(q => q.companyEmail)
+                if (companyEmailQ && !isCompanyEmail(screenerResponses[companyEmailQ.id])) {
+                  setEmailError('Please use a company email address')
+                  return
+                }
+                setCurrentSection(currentSection + 1)
+              }}>Next</Button> : <Button onClick={() => {
+                const allCompanyEmailQs = SCREENER_SECTIONS.flatMap(s => s.questions).filter(q => q.companyEmail)
+                const invalid = allCompanyEmailQs.find(q => !isCompanyEmail(screenerResponses[q.id]))
+                if (invalid) { setEmailError('Please use a company email address'); return }
+                setPhase('diagnostic'); setCurrentPillar(0)
+              }}>Continue to Diagnostic</Button>}
             </div>
           </TabsContent>
           <TabsContent value="diagnostic" className="space-y-6 mt-6">
@@ -2554,7 +2754,39 @@ export default function App() {
       if (event === 'SIGNED_IN') checkAuth()
       if (event === 'SIGNED_OUT') { setUser(null); setProfile(null); setDemoMode(false); setDemoActive(false); navigate('/login') }
     })
-    return () => subscription?.unsubscribe()
+
+    // Session timeout check - polls every minute
+    let timeoutInterval
+    async function checkSessionTimeout() {
+      if (_demoMode) return
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        const res = await fetch('/api/auth/session-timeout')
+        const { timeout_minutes } = await res.json()
+        const lastActivity = parseInt(sessionStorage.getItem('last_activity') || '0')
+        const now = Date.now()
+        if (lastActivity && (now - lastActivity) > timeout_minutes * 60 * 1000) {
+          logAuthEvent('logout', session.user?.email, { reason: 'session_timeout' })
+          await supabase.auth.signOut()
+          toast.error('Session expired due to inactivity')
+          navigate('/login')
+        }
+      } catch (e) { /* silent */ }
+    }
+    // Track user activity
+    function updateActivity() { sessionStorage.setItem('last_activity', Date.now().toString()) }
+    updateActivity()
+    window.addEventListener('click', updateActivity)
+    window.addEventListener('keydown', updateActivity)
+    timeoutInterval = setInterval(checkSessionTimeout, 60000)
+
+    return () => {
+      subscription?.unsubscribe()
+      clearInterval(timeoutInterval)
+      window.removeEventListener('click', updateActivity)
+      window.removeEventListener('keydown', updateActivity)
+    }
   }, [])
 
   async function checkAuth() {
@@ -2598,7 +2830,7 @@ export default function App() {
         {route.page === 'project-detail' && <ProjectDetailPage id={route.id} />}
         {route.page === 'screener' && <ScreenerPage id={route.id} />}
         {route.page === 'diagnostic' && <DiagnosticPage id={route.id} />}
-        {route.page === 'scores' && <ScoresPage id={route.id} />}
+        {route.page === 'scores' && <ScoresPage id={route.id} assessmentId={route.assessmentId} />}
         {route.page === 'not-found' && <NotFoundPage />}
       </AppShell>
     </AuthContext.Provider>

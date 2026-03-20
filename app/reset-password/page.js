@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Loader2, Eye, EyeOff, KeyRound, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { validatePassword } from '@/lib/passwordValidation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -47,8 +48,9 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     setError('')
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+    const pwCheck = validatePassword(password)
+    if (!pwCheck.valid) {
+      setError('Password requirements: ' + pwCheck.errors.join(', '))
       return
     }
     if (password !== confirmPassword) {
@@ -58,8 +60,17 @@ export default function ResetPasswordPage() {
 
     setLoading(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) throw updateError
+      // Log password reset completion
+      try {
+        await fetch('/api/auth/login-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: session?.user?.email || 'unknown', event_type: 'password_reset_complete', user_id: session?.user?.id })
+        })
+      } catch (e) { /* silent */ }
       await supabase.auth.signOut()
       setSuccess(true)
       toast.success('Password updated successfully!')
@@ -155,7 +166,7 @@ export default function ResetPasswordPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="Min. 6 characters"
+                    placeholder="Min. 8 chars, upper, lower, number, symbol"
                     required
                     className="h-11 pr-10 bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary"
                     data-testid="reset-password-input"

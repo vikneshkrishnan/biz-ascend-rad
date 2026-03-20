@@ -1,254 +1,264 @@
-# 🧠 Prime Summary: Biz Ascend RAD™
+# Prime Summary: Biz Ascend RAD
 
-> Generated on: 2026-03-17
-> Analyzer: Claude Code — Prime Command
+> Generated on: 2026-03-20
+> Analyzer: Claude Code -- Prime Command
+> Last updated: 2026-03-20 (post audit gap fixes)
 
 ---
 
 ## 1. Project Overview
 
-- **Name**: Biz Ascend RAD™ (Revenue Acceleration Diagnostic)
-- **Description**: B2B growth consulting platform where consultants diagnose, score, and accelerate client revenue growth systems. Features questionnaire-based assessments, AI-powered report generation, and PDF exports.
-- **Type**: Web App (Full-stack)
-- **Language**: JavaScript (ES6+), Python (scripts)
-- **Framework**: Next.js 14
+- **Name**: Biz Ascend RAD (Revenue Acceleration Diagnostic)
+- **Description**: A B2B diagnostic platform that evaluates companies across 9 growth pillars (80 scored questions), calculates weighted RAD scores and RAPS (Revenue Achievement Probability Score), generates AI-powered diagnostic reports with market intelligence, and produces 30-60-90 day action plans. Supports multi-tenant organizations, questionnaire distribution via tokenized links, and PDF export.
+- **Type**: Full-stack web application (single-page app with API routes)
+- **Language**: JavaScript (ES modules)
+- **Framework**: Next.js 14.2
 - **License**: Private
 
 ## 2. Tech Stack
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Runtime | Node.js | - |
+| Runtime | Node.js | (managed by Next.js) |
 | Framework | Next.js | 14.2.35 |
-| UI Library | React | ^18 |
-| Database | Supabase (PostgreSQL) | - |
-| ORM/Client | @supabase/supabase-js | ^2.49.0 |
-| Auth | Supabase Auth | via @supabase/ssr ^0.6.0 |
-| State/Data | TanStack Query | ^5.62.0 |
-| UI Components | shadcn/ui (Radix primitives) | new-york style |
-| Styling | Tailwind CSS | ^3.4.1 |
-| Charts | Recharts | ^2.15.3 |
-| 3D | Three.js / R3F | ^0.183.2 |
+| Database | PostgreSQL (Supabase) | 17.6 |
+| ORM | Supabase JS Client | ^2.49.0 |
+| Auth | Supabase Auth | Built-in |
 | AI | Anthropic Claude SDK | ^0.78.0 |
-| PDF | jspdf (client) + WeasyPrint (server/Python) | - |
-| Forms | react-hook-form + zod | ^7.58.1 / ^3.25.67 |
-| Testing | Playwright (E2E) | - |
+| UI Components | Radix UI + shadcn/ui | Various |
+| Charts | Recharts | ^2.15.3 |
+| PDF | jsPDF | ^4.2.0 |
+| CSS | Tailwind CSS | ^3.4.1 |
+| Testing | Playwright | (e2e) |
+| Deployment | Vercel | (inferred from config) |
 
 ## 3. Architecture
 
-**Pattern**: Monolith
-**Style**: Page-centric with hash-based client routing
+**Pattern**: Monolith (single Next.js app)
+**Style**: Mega-file SPA with catch-all API route
 
 ### Request Lifecycle
-1. Client uses hash-based router (`#/dashboard`, `#/projects`, etc.) in `app/page.js`
-2. API calls go through `apiFetch()` helper → `/api/[[...path]]/route.js` (single catch-all API route)
-3. API route handles auth via Supabase JWT, routes to appropriate handler by path pattern
-4. Supabase PostgreSQL for persistence; demo mode uses mock data from `lib/mockData.js`
-5. AI reports generated via Anthropic Claude SDK (`lib/reportAgent.js`)
-6. PDF generation via Python scripts (WeasyPrint) or client-side jspdf
+1. Client-side SPA (`app/page.js`, 2825 lines) handles all routing via hash-based navigation
+2. API calls go to `app/api/[[...path]]/route.js` (1070 lines) -- a single catch-all route handler
+3. API route uses Supabase service role key (bypasses RLS) for all DB operations
+4. AI report generation calls Claude Sonnet via `@anthropic-ai/sdk` with web search for market intel
+5. PDF generation is client-side via jsPDF
 
 ### Key Decisions
-- **Hash-based routing** instead of Next.js file-based routing — entire SPA in single `page.js`
-- **Single catch-all API route** (`app/api/[[...path]]/route.js`, 843 lines) handles all endpoints
-- **Demo mode** allows full UI exploration with mock data, no Supabase required
-- **Component extraction** partially done — dashboard, projects, auth, scores moved to `/components/`
-- **Python scripts** for server-side PDF generation and email (WeasyPrint, Resend API)
+- **Single-file SPA**: All page components (Login, Dashboard, Screener, Diagnostic, Scores, PublicAssess) live in `app/page.js`
+- **Catch-all API**: All ~45 endpoints in one route handler with manual path matching
+- **Supabase service role on server**: All DB access through admin client, no client-side DB queries
+- **Client-side PDF**: jsPDF generates reports in-browser rather than server-side
+- **Demo mode**: Full client-side mock data system for UI testing without Supabase
+- **9-pillar weighted scoring**: Rebrief spec weights summing to 1.00 with 4-band maturity classification
 
 ## 4. Directory Structure
 
 ```
+.
 ├── app/
-│   ├── page.js              # Main SPA entry (~2600 lines, hash router)
+│   ├── page.js              # Main SPA (2825 lines) - all pages
 │   ├── layout.js             # Root layout
-│   ├── providers.js          # Theme + QueryClient providers
-│   ├── globals.css           # Tailwind + custom styles
+│   ├── providers.js           # Theme provider
+│   ├── globals.css            # Global styles
+│   ├── reset-password/page.js # Standalone reset password page
 │   └── api/[[...path]]/
-│       └── route.js          # Monolithic API (843 lines)
+│       └── route.js           # Catch-all API (1070 lines, ~45 endpoints)
 ├── components/
-│   ├── ui/                   # shadcn/ui primitives (40+ components)
-│   ├── auth/                 # LoginPage
-│   ├── dashboard/            # DashboardPage
-│   ├── projects/             # ProjectsList, ProjectDetail, CreateProject
-│   ├── scores/               # ScoresPage
-│   ├── users/                # AdminUsersPage
-│   ├── layout/               # AppShell (sidebar)
-│   └── shared/               # Context, ui-helpers
+│   ├── ui/                    # shadcn/ui primitives (28 files)
+│   ├── shared/                # Shared context, helpers
+│   ├── layout/AppShell.js     # App shell/sidebar
+│   ├── projects/ProjectDetailPage.js  # Project detail (imported separately)
+│   ├── scores/ScoresPage.js           # Scores page (imported separately)
+│   ├── users/AdminUsersPage.js        # Admin users (imported separately)
+│   └── dashboard/DashboardPage.js     # Dashboard (imported separately)
 ├── lib/
-│   ├── constants.js          # Industries, pillars, bands, questions
-│   ├── mockData.js           # Demo mode data
-│   ├── supabase.js           # Supabase client init
-│   ├── reportAgent.js        # Claude AI report generation
-│   ├── generatePdf.js        # Client-side PDF generation
-│   └── utils.js              # Helpers (cn, getMaturityBand)
-├── scripts/
-│   ├── generate_report.py    # Server-side AI report generation
-│   ├── generate_pdf.py       # WeasyPrint PDF generation
-│   └── email_service.py      # Resend email service
-├── hooks/                    # Custom React hooks
-├── migrations/               # SQL migration files (2)
-├── tests/e2e/                # Playwright E2E tests (5 spec files)
-├── specs/                    # Feature specs and plans
-└── memory/                   # PRD and project memory
+│   ├── constants.js           # All questions, pillars, weights, options
+│   ├── rapsCalculation.js     # RAPS scoring engine
+│   ├── reportAgent.js         # Claude AI report + market intel generation
+│   ├── generatePdf.js         # Client-side PDF generation
+│   ├── mockData.js            # Demo mode data
+│   ├── supabase.js            # Client-side Supabase init
+│   ├── passwordValidation.js  # Password strength rules
+│   └── utils.js               # Tailwind merge utility
+├── migrations/                # 5 SQL migration files
+├── tests/e2e/                 # 5 Playwright test specs
+├── specs/                     # Feature specs and docs
+└── scripts/                   # Python scripts (legacy, unused)
 ```
 
 ## 5. Entry Points
 
-- **Main**: `app/page.js` — SPA with hash router, auth context, all page views
-- **Dev**: `yarn dev` — Next.js dev server on port 3000 (512MB heap limit)
-- **Build**: `yarn build` — Next.js production build
-- **Test**: Playwright (`tests/playwright.config.ts`)
+- **Main**: `app/page.js` -- SPA with hash routing, all page components
+- **API**: `app/api/[[...path]]/route.js` -- Catch-all REST API
+- **Dev**: `npm run dev` (Next.js dev server, port 3000)
+- **Build**: `npm run build`
+- **Start**: `npm start`
 
 ## 6. API Surface
 
-All endpoints handled in `app/api/[[...path]]/route.js`:
-
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | /api/auth/me | Current user profile |
-| GET | /api/projects | List projects |
-| POST | /api/projects | Create project |
-| GET | /api/projects/:id | Project detail |
-| PATCH | /api/projects/:id | Update project |
-| DELETE | /api/projects/:id | Archive/delete project |
-| GET/PUT | /api/projects/:id/screener | Screener responses |
-| POST | /api/projects/:id/screener/submit | Submit screener |
-| GET/PUT | /api/projects/:id/diagnostic | Diagnostic responses |
-| POST | /api/projects/:id/diagnostic/submit | Submit diagnostic |
-| GET | /api/projects/:id/scores | Calculated scores |
-| POST | /api/projects/:id/report/generate | Generate AI report |
-| GET | /api/projects/:id/report | Get report |
-| GET | /api/projects/:id/report/pdf | Download PDF |
-| POST | /api/notifications/send-report | Send report email |
-| POST | /api/notifications/password-reset | Password reset email |
-| POST | /api/notifications/send-pdf-report | Send PDF to client |
-| GET/PATCH | /api/organization | Organization settings |
-| GET/POST/PATCH | /api/users | User management (admin) |
-| GET | /api/admin/stats | Platform statistics |
-| GET/PUT/POST | /api/assess/:token | Public assessment |
+| GET | `/` | Health check |
+| GET | `/auth/me` | Get current user profile |
+| POST | `/auth/login-log` | Log auth events |
+| GET | `/auth/logs` | Admin: view auth logs |
+| GET | `/auth/session-timeout` | Get session timeout config |
+| GET/PATCH | `/settings` | Platform settings CRUD |
+| GET/POST | `/users` | List/create users |
+| PATCH/DELETE | `/users/:id` | Update/deactivate user |
+| GET/POST | `/projects` | List/create projects |
+| GET/PATCH/DELETE | `/projects/:id` | Project CRUD |
+| GET/PUT | `/projects/:id/screener` | Screener responses |
+| POST | `/projects/:id/screener/submit` | Submit screener |
+| GET/PUT | `/projects/:id/diagnostic` | Diagnostic responses |
+| POST | `/projects/:id/diagnostic/submit` | Submit diagnostic + score |
+| GET | `/projects/:id/scores` | Get scores (with optional recalc) |
+| POST | `/projects/:id/link` | Generate assessment link |
+| POST | `/projects/:id/link/send-email` | Email assessment link |
+| GET/DELETE | `/projects/:id/link` | Get/expire link |
+| GET | `/assess/:token` | Public: load assessment |
+| PUT | `/assess/:token` | Public: save progress |
+| POST | `/assess/:token/submit` | Public: submit assessment |
+| GET | `/projects/:id/assessments` | List assessments |
+| GET | `/projects/:id/scores/compare` | Compare scores across assessments |
+| POST | `/projects/:id/reassess` | Create reassessment |
+| GET | `/admin/stats` | Dashboard statistics |
+| POST | `/admin/recalculate-scores/:id` | Recalculate project scores |
+| GET | `/activity` | Activity log |
+| GET | `/organization` | Org details |
+| PATCH | `/organization/settings` | Update org settings |
+| POST | `/projects/:id/report/generate` | Generate AI report |
+| GET | `/projects/:id/report` | Get report data |
+| GET | `/projects/:id/report/pdf` | Get PDF data |
+| POST | `/notifications/send-report` | Email report link |
+| POST | `/notifications/password-reset` | Send password reset |
+| POST | `/notifications/send-pdf-report` | Email PDF report |
 
-**Total endpoints detected**: ~25
+**Total endpoints detected**: ~45
 
 ## 7. Data Models
 
-| Model | Table | Key Fields |
-|-------|-------|------------|
-| Profile | profiles | id, auth_id, email, name, role (admin/consultant) |
-| Project | projects | id, company_name, industry, status, consultant_id |
-| Assessment | assessments | id, project_id, assessment_number, screener/diagnostic status & responses, scores, report_data |
-| Questionnaire Link | questionnaire_links | id, project_id, token, status, progress |
-| Activity Log | activity_log | (tracking user actions) |
-| Organization | organizations | (multi-tenant, from migration 002) |
+| Table | Purpose |
+|-------|---------|
+| `auth.users` | Supabase auth users |
+| `auth.identities` | Auth provider identities |
+| `profiles` | User profiles (name, role, active status) |
+| `projects` | Client projects (company, industry, status, consultant) |
+| `assessments` | Questionnaire responses, scores, reports |
+| `questionnaire_links` | Tokenized public assessment links |
+| `activity_log` | User activity tracking |
+| `auth_logs` | Authentication event logs |
+| `platform_settings` | Configurable platform parameters |
+| `organizations` | Multi-tenant org data |
 
-**Total models detected**: 6
+**Total tables**: 8 (public) + 2 (auth)
 
 ## 8. Auth & Security
 
-- **Method**: Supabase Auth (email/password), JWT tokens
-- **Auth flow**: Login → Supabase session → JWT passed in Authorization header to API
-- **Roles**: admin, consultant (role-based access)
-- **Demo mode**: Bypasses auth entirely with mock data
-- **CORS**: Configurable via `CORS_ORIGINS` env var
-- **Security headers**: X-Frame-Options: SAMEORIGIN
+- **Method**: Supabase Auth (email/password)
+- **Server auth**: Service role key (bypasses RLS) for all API operations
+- **Client auth**: Anon key for auth operations only (signIn, signUp, signOut)
+- **Roles**: `admin` and `consultant` (stored in profiles table)
+- **Session**: Client-side timeout tracking with configurable duration
+- **Public access**: Token-based assessment links with expiry enforcement
+- **Email validation**: Company email required for screener Q3 (free email domains blocked)
+- **RLS**: Enabled on all tables but policies are minimal (API uses service role)
 
 ## 9. Configuration
 
-### Environment Variables Detected
+### Environment Variables
 | Variable | Purpose |
 |----------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server) |
-| `ANTHROPIC_API_KEY` | Claude AI API key |
-| `NEXT_PUBLIC_BASE_URL` | App base URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side) |
+| `ANTHROPIC_API_KEY` | Claude API key for report generation |
+| `NEXT_PUBLIC_BASE_URL` | Base URL for link generation |
 | `CORS_ORIGINS` | Allowed CORS origins |
-| `RESEND_API_KEY` | Email service API key |
-| `SENDER_EMAIL` | Email sender address |
-| `EMERGENT_LLM_KEY` | Emergent platform AI key |
 
 ### Key Config Files
 | File | Purpose |
 |------|---------|
-| `next.config.js` | Next.js config (images, CORS headers) |
-| `tailwind.config.js` | Tailwind theme config |
+| `next.config.js` | CORS headers, image config |
+| `tailwind.config.js` | Theme, colors, animations |
 | `jsconfig.json` | Path aliases (@/) |
-| `components.json` | shadcn/ui config (new-york style) |
-| `postcss.config.js` | PostCSS config |
+| `components.json` | shadcn/ui config |
 
 ## 10. Dependencies (Top 15)
 
 | Package | Purpose |
 |---------|---------|
-| next | React framework (SSR, API routes) |
-| react / react-dom | UI library |
-| @supabase/supabase-js | Database & auth client |
-| @tanstack/react-query | Server state management |
-| @anthropic-ai/sdk | Claude AI integration |
-| recharts | Data visualization charts |
-| jspdf | Client-side PDF generation |
-| react-hook-form + zod | Form handling + validation |
-| tailwindcss | Utility-first CSS |
-| lucide-react | Icon library |
-| @tanstack/react-table | Data tables |
-| next-themes | Dark/light mode |
-| three / @react-three/fiber | 3D graphics (login page) |
-| sonner | Toast notifications |
-| axios | HTTP client |
+| `next` | React framework |
+| `@supabase/supabase-js` | Database & auth client |
+| `@anthropic-ai/sdk` | Claude AI for reports |
+| `jspdf` | Client-side PDF generation |
+| `recharts` | Charts and visualizations |
+| `lucide-react` | Icon library |
+| `@radix-ui/*` | Headless UI primitives |
+| `tailwindcss` | Utility-first CSS |
+| `sonner` | Toast notifications |
+| `uuid` | Token generation |
+| `date-fns` | Date formatting |
+| `zod` | Schema validation |
+| `react-hook-form` | Form state management |
+| `html2canvas` | Screenshot capture |
+| `next-themes` | Dark/light mode |
 
 ## 11. Scripts / Commands
 
 | Command | Purpose |
 |---------|---------|
-| `yarn dev` | Start dev server (port 3000, 512MB heap) |
-| `yarn build` | Production build |
-| `yarn start` | Start production server |
-| `yarn dev:no-reload` | Dev without memory limit |
+| `npm run dev` | Start dev server (port 3000, 512MB heap) |
+| `npm run build` | Production build |
+| `npm start` | Start production server |
 
 ## 12. Testing
 
-- **Framework**: Playwright (E2E)
+- **Framework**: Playwright (e2e)
 - **Test location**: `tests/e2e/`
-- **Test files**: 5 spec files (core-flows, projects, scores-report, forgot-password, create-project)
-- **Config**: `tests/playwright.config.ts`
-- **Unit tests**: Not detected
+- **Test count**: 5 spec files (core-flows, forgot-password, projects, scores-report, create-project)
+- **Coverage**: Not configured
+- **Config**: `tests/playwright.config.ts` (Chromium only, 60s timeout)
 
 ## 13. Deployment
 
-- **Platform**: Emergent Agent (preview URLs)
-- **CI/CD**: Not detected (no `.github/workflows/`)
-- **Docker**: Not detected
-- **Emergent config**: `.emergent/emergent.yml`
+- **Platform**: Vercel (inferred from URL patterns and base URL logic)
+- **CI/CD**: Not detected (no `.github/workflows`)
+- **Docker**: No
+- **Region**: Supabase in `ap-southeast-2` (Sydney)
 
 ## 14. Patterns & Conventions
 
-- **Naming**: Files: PascalCase for components, camelCase for lib; kebab-case for UI primitives
-- **Components**: shadcn/ui pattern — primitives in `components/ui/`, features in `components/{domain}/`
-- **State**: TanStack Query for server state, React useState for local
-- **Routing**: Hash-based SPA routing (not Next.js file routing)
-- **Styling**: Tailwind CSS with `cn()` utility for conditional classes
-- **Theme**: Dark mode (black + orange) / Light mode (colorful cards) via next-themes
-- **Exports**: Barrel exports via `index.js` in each component directory
-- **API**: Single catch-all route with path parsing
+- **Naming**: Files: PascalCase for components, camelCase for libs. Functions: camelCase
+- **Error handling**: Try/catch with JSON error responses in API, toast notifications on client
+- **Imports**: Path aliases (`@/lib/*`, `@/components/*`)
+- **Code organization**: Mega-file pattern -- most logic in `app/page.js` and single API route
+- **State management**: React useState/useEffect, no external state library
+- **Routing**: Hash-based client-side routing (no Next.js pages router)
+- **API style**: REST with manual path matching in catch-all route
 
-## 15. Tech Debt & Issues
+## 15. Tech Debt & Observations
 
 - **TODOs/FIXMEs**: 0
-- **Monolithic `page.js`**: Main SPA file is ~2600 lines, partial extraction to components done
-- **Monolithic API route**: 843-line single file handles all endpoints — should be split
-- **No unit tests**: Only E2E tests via Playwright
-- **No CI/CD pipeline**: No GitHub Actions or similar detected
-- **Demo mode coupling**: Demo mode logic interleaved with real API logic
-- **Python script execution**: API route shells out to Python scripts via `child_process.exec` — potential security concern with input handling
+- **Mega-file risk**: `app/page.js` is 2825 lines containing 7+ page components -- difficult to maintain
+- **Single API route**: 1070 lines with ~45 endpoints in one file -- should be split
+- **Empty component dirs**: `components/projects/`, `components/scores/`, `components/dashboard/`, `components/users/` exist but some page components still live in `app/page.js`
+- **Legacy Python scripts**: `scripts/` directory contains unused Python files (generate_report.py, generate_pdf.py, email_service.py)
+- **RLS gap**: RLS enabled on all tables but most have no policies -- relying entirely on service role key
+- **No CI/CD**: No automated testing or deployment pipeline detected
+- **Package name mismatch**: `package.json` name is `nextjs-mongo-template` (template artifact)
+- **MongoDB dep**: `mongodb` package in dependencies but not used (Supabase is the DB)
 
 ## 16. Quick Reference
 
 | Task | Command |
 |------|---------|
-| Start dev | `yarn dev` |
-| Run tests | `cd tests && npx playwright test` |
-| Build | `yarn build` |
+| Start dev | `npm run dev` |
+| Build | `npm run build` |
+| Start prod | `npm start` |
+| Run e2e tests | `cd tests && npx playwright test` |
 | Lint | Not configured |
-
-- [2026-03-17] Chore: Reset Password Page — Added `app/reset-password/page.js` so Supabase password reset links land on a working page where users can set a new password.
 
 ---
 
