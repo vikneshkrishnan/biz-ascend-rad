@@ -6,7 +6,7 @@ import { promisify } from 'util'
 import { generateDiagnosticReport, generateMarketReport } from '@/lib/reportAgent'
 import { calculateRAPS, calculateRAPSImprovement, parseCurrency, parseWinRate, parseSalesCycle, estimatePipelineFromLegacy } from '@/lib/rapsCalculation'
 import { validatePassword } from '@/lib/passwordValidation'
-import { PILLAR_WEIGHTS as DEFAULT_PILLAR_WEIGHTS, PILLAR_NAMES as PILLAR_NAME_MAP, FREE_EMAIL_DOMAINS } from '@/lib/constants'
+import { PILLAR_WEIGHTS as DEFAULT_PILLAR_WEIGHTS, PILLAR_NAMES as PILLAR_NAME_MAP, FREE_EMAIL_DOMAINS, CLUSTER_DEFINITIONS, CONSTRAINT_SCENARIO_MAP, DIAGNOSTIC_PILLARS } from '@/lib/constants'
 
 const execPromise = promisify(exec)
 
@@ -147,10 +147,15 @@ function calculateScores(diagnosticResponses, screenerResponses, customWeights =
     const responses = Object.entries(diagnosticResponses || {})
       .filter(([key]) => key.startsWith(pillarId + '_'))
       .filter(([, val]) => typeof val === 'number')
-    if (responses.length === 0) { pillarScores[pillarId] = { score: 0, avg: 0, count: 0 }; continue }
+    if (responses.length === 0) { pillarScores[pillarId] = { score: 0, avg: 0, count: 0, questionRankings: [] }; continue }
     const avg = responses.reduce((sum, [, val]) => sum + val, 0) / responses.length
     const score = Math.round((avg / 5) * 100 * 10) / 10
-    pillarScores[pillarId] = { score, avg: Math.round(avg * 100) / 100, count: responses.length }
+    const pillarDef = DIAGNOSTIC_PILLARS.find(p => p.id === pillarId)
+    const questionRankings = responses.sort((a, b) => a[1] - b[1]).map(([key, val]) => {
+      const qDef = pillarDef?.questions.find(q => q.id === key)
+      return { questionId: key, text: qDef?.text || key, score: val }
+    })
+    pillarScores[pillarId] = { score, avg: Math.round(avg * 100) / 100, count: responses.length, questionRankings }
     totalWeightedScore += score * weight
     if (score < lowestPillar.score) lowestPillar = { id: pillarId, score, name: pillarNames[pillarId] }
   }
@@ -176,12 +181,51 @@ function calculateScores(diagnosticResponses, screenerResponses, customWeights =
   const radScore = Math.round(totalWeightedScore * 10) / 10
   let maturityBand = 'Growth System At Risk'
   if (radScore >= 80) maturityBand = 'Growth Engine Strong'
-  else if (radScore >= 65) maturityBand = 'Growth System Constrained'
-  else if (radScore >= 50) maturityBand = 'Growth System Underpowered'
+  else if (radScore >= 50) maturityBand = 'Growth System Developing'
+
+  // Top 3 strengths (highest scoring pillars)
+  const topPillars = Object.entries(pillarScores)
+    .filter(([, ps]) => ps.score > 0)
+    .sort((a, b) => b[1].score - a[1].score)
+    .slice(0, 3)
+    .map(([pid, ps]) => ({ id: pid, name: pillarNames[pid], score: ps.score }))
+
+  // Operational strengths: per-pillar questions scoring 4 or 5
+  const operationalStrengths = {}
+  for (const [key, val] of Object.entries(diagnosticResponses || {})) {
+    if (typeof val === 'number' && val >= 4) {
+      const pid = key.split('_')[0]
+      if (!operationalStrengths[pid]) operationalStrengths[pid] = []
+      operationalStrengths[pid].push({ questionId: key, score: val })
+    }
+  }
+
+  // Growth leaks grouped by pillar
+  const growthLeaksByPillar = {}
+  growthLeaks.forEach(gl => {
+    if (!growthLeaksByPillar[gl.pillar]) growthLeaksByPillar[gl.pillar] = []
+    growthLeaksByPillar[gl.pillar].push(gl)
+  })
+
+  // Cluster scores
+  const clusterScores = {}
+  for (const [pid, clusters] of Object.entries(CLUSTER_DEFINITIONS)) {
+    clusterScores[pid] = clusters.map(cluster => {
+      const qScores = cluster.questions.map(qid => diagnosticResponses?.[qid]).filter(v => typeof v === 'number')
+      const avg = qScores.length > 0 ? qScores.reduce((s, v) => s + v, 0) / qScores.length : 0
+      return { name: cluster.name, score: Math.round((avg / 5) * 100 * 10) / 10, avg: Math.round(avg * 100) / 100, count: qScores.length }
+    })
+  }
+
+  // AI Transformation Readiness Index
+  const aiReadinessQuestions = ['p9_q7', 'p9_q8', 'p9_q9', 'p9_q10', 'p9_q11']
+  const aiScores = aiReadinessQuestions.map(q => diagnosticResponses?.[q]).filter(v => typeof v === 'number')
+  const aiReadinessIndex = aiScores.length > 0 ? Math.round((aiScores.reduce((s, v) => s + v, 0) / aiScores.length / 5) * 100 * 10) / 10 : null
 
   // RAPS calculation using shared utility
   let raps = null
   let rapsImprovement = null
+  let rapsScenarios = null
   if (screenerResponses) {
     const target = parseCurrency(screenerResponses.q18)
     const invoiced = parseCurrency(screenerResponses.q19)
@@ -204,9 +248,23 @@ function calculateScores(diagnosticResponses, screenerResponses, customWeights =
       winRate: Math.min(1, winRate + 0.05),
       openPipeline: openPipeline * 1.25,
     })
+
+    // 3 RAPS scenarios based on primary constraint
+    if (lowestPillar.id) {
+      const category = constraintCategories[lowestPillar.id]
+      const scenarioConfig = CONSTRAINT_SCENARIO_MAP[category] || { winRateDelta: 0.05, pipelineMultiplier: 1.25 }
+      rapsScenarios = {
+        conservative: calculateRAPSImprovement(rapsInputs, { winRate: Math.min(1, winRate + scenarioConfig.winRateDelta * 0.5), openPipeline: openPipeline * (1 + (scenarioConfig.pipelineMultiplier - 1) * 0.5) }),
+        moderate: calculateRAPSImprovement(rapsInputs, { winRate: Math.min(1, winRate + scenarioConfig.winRateDelta), openPipeline: openPipeline * scenarioConfig.pipelineMultiplier }),
+        aggressive: calculateRAPSImprovement(rapsInputs, { winRate: Math.min(1, winRate + scenarioConfig.winRateDelta * 1.5), openPipeline: openPipeline * (scenarioConfig.pipelineMultiplier * 1.3) }),
+      }
+    }
   }
 
-  return { radScore, maturityBand, primaryConstraint: lowestPillar, constraints, growthLeaks, pillarScores, raps, rapsImprovement }
+  // Revenue at risk
+  const revenueAtRisk = raps ? Math.max(0, raps.revenueRemaining - raps.expectedConvertible) : null
+
+  return { radScore, maturityBand, primaryConstraint: lowestPillar, constraints, growthLeaks, growthLeaksByPillar, pillarScores, raps, rapsImprovement, rapsScenarios, topPillars, operationalStrengths, revenueAtRisk, clusterScores, aiReadinessIndex }
 }
 
 export async function OPTIONS() {
@@ -547,8 +605,11 @@ async function handleRoute(request, { params }) {
       }
       const { data: assessment } = await assessmentQuery
       if (!assessment) return err('No assessment found', 404)
-      if (assessment.scores) return json(assessment.scores)
-      // Calculate if not cached
+      if (assessment.scores) {
+        const hasRankings = Object.values(assessment.scores.pillarScores || {}).every(p => Array.isArray(p.questionRankings))
+        if (hasRankings) return json(assessment.scores)
+        // Recalculate to include questionRankings with text
+      }
       if (assessment.diagnostic_status === 'completed') {
         const scores = calculateScores(assessment.diagnostic_responses, assessment.screener_responses)
         await supabaseAdmin.from('assessments').update({ scores }).eq('id', assessment.id)
@@ -872,7 +933,7 @@ async function handleRoute(request, { params }) {
 
         await supabaseAdmin.from('assessments').update({ report_data: fullReport, report_generated_at: new Date().toISOString() }).eq('id', assessment.id)
         await logActivity(user.profile.id, projectId, 'Generated diagnostic report')
-        return json(fullReport)
+        return json({ ...fullReport, scores: reportInput.scores, screener_responses: assessment.screener_responses })
       } catch (reportErr) {
         console.error('Report generation error:', reportErr)
         return err('Report generation failed: ' + reportErr.message, 500)

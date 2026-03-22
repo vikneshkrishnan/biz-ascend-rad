@@ -2,7 +2,7 @@
 
 > Generated on: 2026-03-20
 > Analyzer: Claude Code -- Prime Command
-> Last updated: 2026-03-20 (post audit gap fixes)
+> Last updated: 2026-03-22 (refreshed line counts and structure)
 
 ---
 
@@ -25,6 +25,7 @@
 | ORM | Supabase JS Client | ^2.49.0 |
 | Auth | Supabase Auth | Built-in |
 | AI | Anthropic Claude SDK | ^0.78.0 |
+| AI Model | Claude Sonnet 4.6 | claude-sonnet-4-6 |
 | UI Components | Radix UI + shadcn/ui | Various |
 | Charts | Recharts | ^2.15.3 |
 | PDF | jsPDF | ^4.2.0 |
@@ -38,11 +39,11 @@
 **Style**: Mega-file SPA with catch-all API route
 
 ### Request Lifecycle
-1. Client-side SPA (`app/page.js`, 2825 lines) handles all routing via hash-based navigation
-2. API calls go to `app/api/[[...path]]/route.js` (1070 lines) -- a single catch-all route handler
+1. Client-side SPA (`app/page.js`, 2838 lines) handles all routing via hash-based navigation
+2. API calls go to `app/api/[[...path]]/route.js` (1130 lines) -- a single catch-all route handler
 3. API route uses Supabase service role key (bypasses RLS) for all DB operations
-4. AI report generation calls Claude Sonnet via `@anthropic-ai/sdk` with web search for market intel
-5. PDF generation is client-side via jsPDF
+4. AI report generation calls Claude Sonnet via `@anthropic-ai/sdk` with structured output schemas and web search for market intel
+5. PDF generation is client-side via jsPDF (2109 lines in `lib/generatePdf.js`)
 
 ### Key Decisions
 - **Single-file SPA**: All page components (Login, Dashboard, Screener, Diagnostic, Scores, PublicAssess) live in `app/page.js`
@@ -51,47 +52,54 @@
 - **Client-side PDF**: jsPDF generates reports in-browser rather than server-side
 - **Demo mode**: Full client-side mock data system for UI testing without Supabase
 - **9-pillar weighted scoring**: Rebrief spec weights summing to 1.00 with 4-band maturity classification
+- **AI Report Agent**: Uses Claude with structured output schemas (executive summary, pillar narratives, competitive clarity, action plans, market intel)
 
 ## 4. Directory Structure
 
 ```
 .
 ├── app/
-│   ├── page.js              # Main SPA (2825 lines) - all pages
+│   ├── page.js              # Main SPA (2838 lines) - all pages
 │   ├── layout.js             # Root layout
 │   ├── providers.js           # Theme provider
 │   ├── globals.css            # Global styles
 │   ├── reset-password/page.js # Standalone reset password page
 │   └── api/[[...path]]/
-│       └── route.js           # Catch-all API (1070 lines, ~45 endpoints)
+│       └── route.js           # Catch-all API (1130 lines, ~45 endpoints)
 ├── components/
-│   ├── ui/                    # shadcn/ui primitives (28 files)
-│   ├── shared/                # Shared context, helpers
+│   ├── ui/                    # shadcn/ui primitives (24 files)
+│   ├── shared/                # Shared context, helpers (3 files)
 │   ├── layout/AppShell.js     # App shell/sidebar
-│   ├── projects/ProjectDetailPage.js  # Project detail (imported separately)
-│   ├── scores/ScoresPage.js           # Scores page (imported separately)
-│   ├── users/AdminUsersPage.js        # Admin users (imported separately)
-│   └── dashboard/DashboardPage.js     # Dashboard (imported separately)
+│   ├── auth/                  # Auth components (empty)
+│   ├── projects/              # Project components (empty)
+│   ├── scores/                # Scores components (empty)
+│   ├── users/                 # User components (empty)
+│   └── dashboard/             # Dashboard components (empty)
 ├── lib/
-│   ├── constants.js           # All questions, pillars, weights, options
-│   ├── rapsCalculation.js     # RAPS scoring engine
-│   ├── reportAgent.js         # Claude AI report + market intel generation
-│   ├── generatePdf.js         # Client-side PDF generation
-│   ├── mockData.js            # Demo mode data
-│   ├── supabase.js            # Client-side Supabase init
-│   ├── passwordValidation.js  # Password strength rules
-│   └── utils.js               # Tailwind merge utility
+│   ├── constants.js           # All questions, pillars, weights, options (377 lines)
+│   ├── rapsCalculation.js     # RAPS scoring engine (227 lines)
+│   ├── reportAgent.js         # Claude AI report + market intel (1508 lines)
+│   ├── generatePdf.js         # Client-side PDF generation (2109 lines)
+│   ├── mockData.js            # Demo mode data (480 lines)
+│   ├── supabase.js            # Client-side Supabase init (6 lines)
+│   ├── passwordValidation.js  # Password strength rules (12 lines)
+│   └── utils.js               # Tailwind merge utility (12 lines)
+├── hooks/                     # React hooks (use-mobile, use-toast)
 ├── migrations/                # 5 SQL migration files
 ├── tests/e2e/                 # 5 Playwright test specs
-├── specs/                     # Feature specs and docs
-└── scripts/                   # Python scripts (legacy, unused)
+├── specs/                     # Feature specs and docs (~40 files)
+├── scripts/                   # Python scripts (PDF, email, report - server-side)
+├── memory/                    # PRD and project docs
+└── public/                    # Static assets (logo)
 ```
+
+**Total source files**: 43 | **Total lines (lib + app)**: ~8,699
 
 ## 5. Entry Points
 
 - **Main**: `app/page.js` -- SPA with hash routing, all page components
 - **API**: `app/api/[[...path]]/route.js` -- Catch-all REST API
-- **Dev**: `npm run dev` (Next.js dev server, port 3000)
+- **Dev**: `npm run dev` (Next.js dev server, port 3000, 512MB heap limit)
 - **Build**: `npm run build`
 - **Start**: `npm start`
 
@@ -145,8 +153,8 @@
 | `auth.identities` | Auth provider identities |
 | `profiles` | User profiles (name, role, active status) |
 | `projects` | Client projects (company, industry, status, consultant) |
-| `assessments` | Questionnaire responses, scores, reports |
-| `questionnaire_links` | Tokenized public assessment links |
+| `assessments` | Questionnaire responses, scores, reports (JSONB fields) |
+| `questionnaire_links` | Tokenized public assessment links with expiry |
 | `activity_log` | User activity tracking |
 | `auth_logs` | Authentication event logs |
 | `platform_settings` | Configurable platform parameters |
@@ -175,7 +183,6 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side) |
 | `ANTHROPIC_API_KEY` | Claude API key for report generation |
 | `NEXT_PUBLIC_BASE_URL` | Base URL for link generation |
-| `CORS_ORIGINS` | Allowed CORS origins |
 
 ### Key Config Files
 | File | Purpose |
@@ -226,7 +233,7 @@
 - **Platform**: Vercel (inferred from URL patterns and base URL logic)
 - **CI/CD**: Not detected (no `.github/workflows`)
 - **Docker**: No
-- **Region**: Supabase in `ap-southeast-2` (Sydney)
+- **Preview URL**: `biz-ascend-rad.vercel.app`
 
 ## 14. Patterns & Conventions
 
@@ -234,21 +241,24 @@
 - **Error handling**: Try/catch with JSON error responses in API, toast notifications on client
 - **Imports**: Path aliases (`@/lib/*`, `@/components/*`)
 - **Code organization**: Mega-file pattern -- most logic in `app/page.js` and single API route
-- **State management**: React useState/useEffect, no external state library
+- **State management**: React useState/useEffect + TanStack Query for server state
 - **Routing**: Hash-based client-side routing (no Next.js pages router)
 - **API style**: REST with manual path matching in catch-all route
+- **AI integration**: Structured output schemas with parallel section generation
 
 ## 15. Tech Debt & Observations
 
 - **TODOs/FIXMEs**: 0
-- **Mega-file risk**: `app/page.js` is 2825 lines containing 7+ page components -- difficult to maintain
-- **Single API route**: 1070 lines with ~45 endpoints in one file -- should be split
-- **Empty component dirs**: `components/projects/`, `components/scores/`, `components/dashboard/`, `components/users/` exist but some page components still live in `app/page.js`
-- **Legacy Python scripts**: `scripts/` directory contains unused Python files (generate_report.py, generate_pdf.py, email_service.py)
+- **Mega-file risk**: `app/page.js` is 2838 lines containing 7+ page components -- difficult to maintain
+- **Single API route**: 1130 lines with ~45 endpoints in one file -- should be split
+- **Empty component dirs**: `components/auth/`, `components/projects/`, `components/scores/`, `components/dashboard/`, `components/users/` exist but are mostly empty -- pages still live in `app/page.js`
+- **Legacy Python scripts**: `scripts/` directory contains Python files (generate_pdf.py, email_service.py) invoked via child_process from API route
 - **RLS gap**: RLS enabled on all tables but most have no policies -- relying entirely on service role key
 - **No CI/CD**: No automated testing or deployment pipeline detected
 - **Package name mismatch**: `package.json` name is `nextjs-mongo-template` (template artifact)
 - **MongoDB dep**: `mongodb` package in dependencies but not used (Supabase is the DB)
+- **Large PDF generator**: `lib/generatePdf.js` at 2109 lines is the second largest file
+- **Report agent complexity**: `lib/reportAgent.js` at 1508 lines with multiple Claude API calls and structured schemas
 
 ## 16. Quick Reference
 

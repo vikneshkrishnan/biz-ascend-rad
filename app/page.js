@@ -539,7 +539,7 @@ function DashboardPage() {
   ]
 
   const sectorData = stats?.sectors ? Object.entries(stats.sectors).map(([name, value]) => ({ name, value })) : []
-  const COLORS = ['#800000', '#990000', '#7a1a1a', '#660000', '#8b0000', '#a52a2a']
+  const COLORS = ['#264653', '#2A9D8F', '#8AB17D', '#E9C46A', '#E76F51', '#457B9D']
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -1309,7 +1309,7 @@ function ProjectDetailPage({ id }) {
                 
                 <div className="flex-1 space-y-6 text-center md:text-left">
                   <div className="space-y-2">
-                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-band-strong' : getMaturityBand(scores.radScore).includes('Constrained') ? 'bg-band-constrained' : getMaturityBand(scores.radScore).includes('Underpowered') ? 'bg-band-underpowered' : 'bg-band-risk')}>
+                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-band-strong' : getMaturityBand(scores.radScore).includes('Developing') ? 'bg-band-developing' : 'bg-band-risk')}>
                       {getMaturityBand(scores.radScore).toUpperCase()}
                     </Badge>
                     <h2 className="text-3xl font-bold tracking-tight">Executive Summary Available</h2>
@@ -2298,8 +2298,8 @@ function ScoresPage({ id, assessmentId }) {
   if (!scores) return <div className="text-center py-24"><GlassCard className="p-12 max-w-md mx-auto"><AlertTriangle className="w-12 h-12 text-muted-foreground opacity-20 mx-auto mb-4" /><p className="text-muted-foreground font-medium">Intelligence data not finalized</p><Button variant="ghost" className="mt-4" onClick={() => navigate(`/projects/${id}`)}>Return to Project</Button></GlassCard></div>
 
   const maturityBand = getMaturityBand(scores.radScore)
-  const bandClasses = maturityBand.includes('Strong') ? 'bg-band-strong shadow-band-strong/20' : maturityBand.includes('Constrained') ? 'bg-band-constrained shadow-band-constrained/20' : maturityBand.includes('Underpowered') ? 'bg-band-underpowered shadow-band-underpowered/20' : 'bg-band-risk shadow-band-risk/20'
-  const bandColor = (score) => score >= 80 ? 'bg-band-strong' : score >= 65 ? 'bg-band-constrained' : score >= 50 ? 'bg-band-underpowered' : 'bg-band-risk'
+  const bandClasses = maturityBand.includes('Strong') ? 'bg-band-strong shadow-band-strong/20' : maturityBand.includes('Developing') ? 'bg-band-developing shadow-band-developing/20' : 'bg-band-risk shadow-band-risk/20'
+  const bandColor = (score) => score >= 80 ? 'bg-band-strong' : score >= 50 ? 'bg-band-developing' : 'bg-band-risk'
 
   const CustomRadarTick = ({ payload, x, y, cx, cy, ...rest }) => {
     const label = payload.value || ''
@@ -2421,7 +2421,7 @@ function ScoresPage({ id, assessmentId }) {
               <p className="text-xs text-muted-foreground font-medium">Performance across all growth dimensions</p>
             </div>
             <div className="flex gap-1.5">
-              {['bg-band-strong', 'bg-band-constrained', 'bg-band-underpowered', 'bg-band-risk'].map((c) => (
+              {['bg-band-strong', 'bg-band-developing', 'bg-band-risk'].map((c) => (
                 <div key={c} className={cn("w-2 h-2 rounded-full", c)} />
               ))}
             </div>
