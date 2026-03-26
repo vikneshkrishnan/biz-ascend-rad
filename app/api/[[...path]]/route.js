@@ -6,7 +6,7 @@ import { promisify } from 'util'
 import { generateDiagnosticReport, generateMarketReport } from '@/lib/reportAgent'
 import { calculateRAPS, calculateRAPSImprovement, parseCurrency, parseWinRate, parseSalesCycle, estimatePipelineFromLegacy } from '@/lib/rapsCalculation'
 import { validatePassword } from '@/lib/passwordValidation'
-import { PILLAR_WEIGHTS as DEFAULT_PILLAR_WEIGHTS, PILLAR_NAMES as PILLAR_NAME_MAP, FREE_EMAIL_DOMAINS, CLUSTER_DEFINITIONS, CONSTRAINT_SCENARIO_MAP, DIAGNOSTIC_PILLARS } from '@/lib/constants'
+import { PILLAR_WEIGHTS as DEFAULT_PILLAR_WEIGHTS, PILLAR_NAMES as PILLAR_NAME_MAP, FREE_EMAIL_DOMAINS, CLUSTER_DEFINITIONS, CONSTRAINT_SCENARIO_MAP, DIAGNOSTIC_PILLARS, STYLING_RULES } from '@/lib/constants'
 
 const execPromise = promisify(exec)
 
@@ -130,6 +130,39 @@ async function logAuthEvent(eventType, email, request, details = {}) {
   } catch (e) { console.error('Auth log error:', e) }
 }
 
+// Resolve anchor text for each diagnostic response
+function resolveAnchors(diagnosticResponses, salesModel) {
+  if (!diagnosticResponses) return {}
+  const resolved = {}
+  for (const [key, score] of Object.entries(diagnosticResponses)) {
+    if (typeof score !== 'number') continue
+    const match = key.match(/^(p\d+)_(q\d+)$/)
+    if (!match) continue
+    const [, pillarId, qPart] = match
+    const pillarDef = DIAGNOSTIC_PILLARS.find(p => p.id === pillarId)
+    if (!pillarDef) continue
+    const qDef = pillarDef.questions.find(q => q.id === key)
+    if (!qDef) continue
+
+    let options
+    if (qDef.type === 'conditional' && qDef.variants) {
+      // Use salesModel to pick the right variant
+      const variant = salesModel && qDef.variants[salesModel]
+      options = variant ? variant.options : null
+    } else if (qDef.type === 'scored') {
+      options = qDef.options
+    }
+
+    const anchor = options ? options.find(o => o.s === score) : null
+    if (!resolved[pillarId]) resolved[pillarId] = {}
+    resolved[pillarId][qPart] = {
+      score,
+      selected_anchor: anchor ? anchor.l : `Score ${score}/5`,
+    }
+  }
+  return resolved
+}
+
 // Scoring engine
 function calculateScores(diagnosticResponses, screenerResponses, customWeights = null) {
   const pillarWeights = customWeights || DEFAULT_PILLAR_WEIGHTS
@@ -179,9 +212,10 @@ function calculateScores(diagnosticResponses, screenerResponses, customWeights =
     .sort((a, b) => a.score - b.score)
 
   const radScore = Math.round(totalWeightedScore * 10) / 10
-  let maturityBand = 'Growth System At Risk'
-  if (radScore >= 80) maturityBand = 'Growth Engine Strong'
-  else if (radScore >= 50) maturityBand = 'Growth System Developing'
+  let maturityBand = 'At Risk'
+  if (radScore >= 80) maturityBand = 'Strong'
+  else if (radScore >= 60) maturityBand = 'Developing'
+  else if (radScore >= 40) maturityBand = 'Fragile'
 
   // Top 3 strengths (highest scoring pillars)
   const topPillars = Object.entries(pillarScores)
@@ -264,7 +298,40 @@ function calculateScores(diagnosticResponses, screenerResponses, customWeights =
   // Revenue at risk
   const revenueAtRisk = raps ? Math.max(0, raps.revenueRemaining - raps.expectedConvertible) : null
 
-  return { radScore, maturityBand, primaryConstraint: lowestPillar, constraints, growthLeaks, growthLeaksByPillar, pillarScores, raps, rapsImprovement, rapsScenarios, topPillars, operationalStrengths, revenueAtRisk, clusterScores, aiReadinessIndex }
+  // Structured scoring output for v2.0 schema
+  const pillar_matrix = Object.entries(pillarScores).map(([id, ps]) => ({
+    pillar_label: `${id.toUpperCase().replace('P', 'P')}. ${pillarNames[id]}`,
+    weight_pct: `${Math.round(pillarWeights[id] * 100)}%`,
+    raw_avg_display: `${ps.avg.toFixed(2)}/5.0`,
+    weighted_score: ps.score,
+    weighted_score_css: ps.score >= 80 ? 'ws-strong' : ps.score >= 60 ? 'ws-developing' : ps.score >= 40 ? 'ws-fragile' : 'ws-at-risk',
+    band: ps.score >= 80 ? 'Strong' : ps.score >= 60 ? 'Developing' : ps.score >= 40 ? 'Fragile' : 'At Risk',
+    badge_css: ps.score >= 80 ? 'badge-strong' : ps.score >= 60 ? 'badge-developing' : ps.score >= 40 ? 'badge-fragile' : 'badge-at-risk',
+  }))
+
+  const heatmap_rows = Object.entries(pillarScores).map(([id, ps]) => ({
+    pillar_label: pillarNames[id],
+    percentage: ps.score,
+    percentage_display: `${ps.score.toFixed(1)}%`,
+    fill_class: ps.score >= 80 ? 'fill-teal' : ps.score >= 60 ? 'fill-sage' : ps.score >= 40 ? 'fill-gold' : 'fill-coral',
+  }))
+
+  const overall_row = {
+    weighted_score: radScore,
+    weighted_score_css: radScore >= 80 ? 'ws-strong' : radScore >= 60 ? 'ws-developing' : radScore >= 40 ? 'ws-fragile' : 'ws-at-risk',
+    band: maturityBand,
+    badge_css: maturityBand === 'Strong' ? 'badge-strong' : maturityBand === 'Developing' ? 'badge-developing' : maturityBand === 'Fragile' ? 'badge-fragile' : 'badge-at-risk',
+  }
+
+  const radar_chart_data = {
+    labels: Object.values(pillarNames),
+    scores: Object.values(pillarScores).map(ps => ps.score),
+    target: 80,
+  }
+
+  const score_band_css_class = maturityBand === 'Strong' ? 'band-strong' : maturityBand === 'Developing' ? 'band-developing' : maturityBand === 'Fragile' ? 'band-fragile' : 'band-at-risk'
+
+  return { radScore, maturityBand, primaryConstraint: lowestPillar, constraints, growthLeaks, growthLeaksByPillar, pillarScores, raps, rapsImprovement, rapsScenarios, topPillars, operationalStrengths, revenueAtRisk, clusterScores, aiReadinessIndex, pillar_matrix, heatmap_rows, overall_row, radar_chart_data, score_band_css_class }
 }
 
 export async function OPTIONS() {
@@ -315,7 +382,7 @@ async function handleRoute(request, { params }) {
     // GET /auth/session-timeout - Get configured session timeout
     if (route === '/auth/session-timeout' && method === 'GET') {
       const { data } = await supabaseAdmin.from('platform_settings').select('value').eq('key', 'session_timeout_minutes').single()
-      return json({ timeout_minutes: data?.value || 30 })
+      return json({ timeout_minutes: data?.value || 60 })
     }
 
     // ===== PLATFORM SETTINGS (Admin) =====
@@ -567,7 +634,9 @@ async function handleRoute(request, { params }) {
       const body = await request.json()
       const { data: assessment } = await supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: false }).limit(1).single()
       if (!assessment) return err('No assessment found', 404)
-      const updates = { diagnostic_responses: body.responses }
+      const salesModel = assessment.screener_responses?.q10 || null
+      const resolved = resolveAnchors(body.responses, salesModel)
+      const updates = { diagnostic_responses: body.responses, resolved_responses: resolved }
       if (assessment.diagnostic_status === 'not_started') updates.diagnostic_status = 'in_progress'
       const { data, error: e } = await supabaseAdmin.from('assessments').update(updates).eq('id', assessment.id).select().single()
       if (e) throw e
@@ -734,7 +803,11 @@ async function handleRoute(request, { params }) {
         await supabaseAdmin.from('assessments').update({ screener_responses: body.screener_responses, screener_status: 'in_progress' }).eq('id', link.assessment_id)
       }
       if (body.diagnostic_responses) {
-        await supabaseAdmin.from('assessments').update({ diagnostic_responses: body.diagnostic_responses, diagnostic_status: 'in_progress' }).eq('id', link.assessment_id)
+        // Fetch assessment to get screener_responses for salesModel
+        const { data: assessForResolve } = await supabaseAdmin.from('assessments').select('screener_responses').eq('id', link.assessment_id).single()
+        const salesModel = assessForResolve?.screener_responses?.q10 || null
+        const resolved = resolveAnchors(body.diagnostic_responses, salesModel)
+        await supabaseAdmin.from('assessments').update({ diagnostic_responses: body.diagnostic_responses, resolved_responses: resolved, diagnostic_status: 'in_progress' }).eq('id', link.assessment_id)
       }
       // Update progress and track access
       const linkUpdates = { last_accessed_at: new Date().toISOString() }
@@ -929,11 +1002,22 @@ async function handleRoute(request, { params }) {
           }).catch(e => { console.error('Market report error:', e); return { countries: [] } }),
         ])
 
-        const fullReport = { ...reportData, market_report: marketReport, generated_at: new Date().toISOString() }
+        const fullReport = {
+          ...reportData,
+          market_report: marketReport,
+          generated_at: new Date().toISOString(),
+          metadata: {
+            schema_version: '2.0',
+            input_schema_version: '1.5',
+            generated_at: new Date().toISOString(),
+            model_used: 'claude-sonnet-4-20250514',
+          },
+          styling_rules: STYLING_RULES,
+        }
 
         await supabaseAdmin.from('assessments').update({ report_data: fullReport, report_generated_at: new Date().toISOString() }).eq('id', assessment.id)
         await logActivity(user.profile.id, projectId, 'Generated diagnostic report')
-        return json({ ...fullReport, scores: reportInput.scores, screener_responses: assessment.screener_responses })
+        return json({ ...fullReport, scores: reportInput.scores, screener_responses: assessment.screener_responses, diagnostic_responses: assessment.diagnostic_responses })
       } catch (reportErr) {
         console.error('Report generation error:', reportErr)
         return err('Report generation failed: ' + reportErr.message, 500)
@@ -948,7 +1032,7 @@ async function handleRoute(request, { params }) {
       const { data: assessment } = await supabaseAdmin.from('assessments').select('*').eq('project_id', projectId).order('assessment_number', { ascending: false }).limit(1).single()
       if (!assessment) return err('No assessment found', 404)
       if (!assessment.report_data) return err('Report not generated yet', 404)
-      return json({ ...assessment.report_data, scores: assessment.scores, screener_responses: assessment.screener_responses })
+      return json({ ...assessment.report_data, scores: assessment.scores, screener_responses: assessment.screener_responses, diagnostic_responses: assessment.diagnostic_responses })
     }
 
     // GET /projects/:id/report/pdf - Generate PDF download

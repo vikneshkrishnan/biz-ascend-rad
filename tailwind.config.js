@@ -9,15 +9,17 @@ module.exports = {
     ],
     prefix: "",
     safelist: [
-      'bg-band-strong', 'bg-band-developing', 'bg-band-risk',
-      'shadow-band-strong/20', 'shadow-band-developing/20', 'shadow-band-risk/20',
+      'bg-band-strong', 'bg-band-developing', 'bg-band-fragile', 'bg-band-risk',
+      'shadow-band-strong/20', 'shadow-band-developing/20', 'shadow-band-fragile/20', 'shadow-band-risk/20',
       'bg-band-risk/5', 'bg-band-risk/10', 'border-band-risk/10', 'border-band-risk/20', 'border-band-risk/30',
       'text-band-risk', 'text-band-risk/60',
+      'bg-band-fragile/5', 'bg-band-fragile/10', 'border-band-fragile/10', 'border-band-fragile/30',
+      'text-band-fragile',
       'bg-band-developing/5', 'bg-band-developing/10', 'border-band-developing/10', 'border-band-developing/30',
       'text-band-developing',
       'bg-band-strong/5', 'bg-band-strong/10', 'border-band-strong/10', 'border-band-strong/30',
       'text-band-strong',
-      'shadow-band-risk/5', 'shadow-band-strong/5',
+      'shadow-band-risk/5', 'shadow-band-fragile/5', 'shadow-band-strong/5',
     ],
     theme: {
     	container: {
@@ -34,6 +36,7 @@ module.exports = {
     		colors: {
     			band: {
     				risk: '#E76F51',
+    				fragile: '#E9C46A',
     				developing: '#8AB17D',
     				strong: '#2A9D8F',
     			},

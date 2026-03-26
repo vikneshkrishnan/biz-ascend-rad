@@ -30,7 +30,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Cell, AreaChart, Area, Tooltip as RechartsTooltip } from 'recharts'
-import { INDUSTRIES, SCREENER_SECTIONS, DIAGNOSTIC_PILLARS, MATURITY_BANDS, PILLAR_NAMES, FREE_EMAIL_DOMAINS, MONTHS, QUESTIONNAIRE_BASE_URL } from '@/lib/constants'
+import { INDUSTRIES, SCREENER_SECTIONS, DIAGNOSTIC_PILLARS, MATURITY_BANDS, PILLAR_NAMES, PILLAR_WEIGHTS, FREE_EMAIL_DOMAINS, MONTHS, QUESTIONNAIRE_BASE_URL } from '@/lib/constants'
 import { DEMO_PROFILE, DEMO_USERS, DEMO_PROJECTS, DEMO_STATS, DEMO_ACTIVITY, demoApiFetch } from '@/lib/mockData'
 import { cn, getMaturityBand } from '@/lib/utils'
 import { generateClientPdf } from '@/lib/generatePdf'
@@ -1309,7 +1309,7 @@ function ProjectDetailPage({ id }) {
                 
                 <div className="flex-1 space-y-6 text-center md:text-left">
                   <div className="space-y-2">
-                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore).includes('Strong') ? 'bg-band-strong' : getMaturityBand(scores.radScore).includes('Developing') ? 'bg-band-developing' : 'bg-band-risk')}>
+                    <Badge className={cn("text-white font-black px-4 py-1 rounded-full", getMaturityBand(scores.radScore) === 'Strong' ? 'bg-band-strong' : getMaturityBand(scores.radScore) === 'Developing' ? 'bg-band-developing' : getMaturityBand(scores.radScore) === 'Fragile' ? 'bg-band-fragile' : 'bg-band-risk')}>
                       {getMaturityBand(scores.radScore).toUpperCase()}
                     </Badge>
                     <h2 className="text-3xl font-bold tracking-tight">Executive Summary Available</h2>
@@ -2285,6 +2285,7 @@ function ScoresPage({ id, assessmentId }) {
         report: reportData,
         project,
         screenerResponses: reportData?.screener_responses || {},
+        diagnosticResponses: reportData?.diagnostic_responses || {},
       })
       toast.success('Executive PDF Exported')
     } catch (err) {
@@ -2298,8 +2299,8 @@ function ScoresPage({ id, assessmentId }) {
   if (!scores) return <div className="text-center py-24"><GlassCard className="p-12 max-w-md mx-auto"><AlertTriangle className="w-12 h-12 text-muted-foreground opacity-20 mx-auto mb-4" /><p className="text-muted-foreground font-medium">Intelligence data not finalized</p><Button variant="ghost" className="mt-4" onClick={() => navigate(`/projects/${id}`)}>Return to Project</Button></GlassCard></div>
 
   const maturityBand = getMaturityBand(scores.radScore)
-  const bandClasses = maturityBand.includes('Strong') ? 'bg-band-strong shadow-band-strong/20' : maturityBand.includes('Developing') ? 'bg-band-developing shadow-band-developing/20' : 'bg-band-risk shadow-band-risk/20'
-  const bandColor = (score) => score >= 80 ? 'bg-band-strong' : score >= 50 ? 'bg-band-developing' : 'bg-band-risk'
+  const bandClasses = maturityBand === 'Strong' ? 'bg-band-strong shadow-band-strong/20' : maturityBand === 'Developing' ? 'bg-band-developing shadow-band-developing/20' : maturityBand === 'Fragile' ? 'bg-band-fragile shadow-band-fragile/20' : 'bg-band-risk shadow-band-risk/20'
+  const bandColor = (score) => score >= 80 ? 'bg-band-strong' : score >= 60 ? 'bg-band-developing' : score >= 40 ? 'bg-band-fragile' : 'bg-band-risk'
 
   const CustomRadarTick = ({ payload, x, y, cx, cy, ...rest }) => {
     const label = payload.value || ''
@@ -2421,7 +2422,7 @@ function ScoresPage({ id, assessmentId }) {
               <p className="text-xs text-muted-foreground font-medium">Performance across all growth dimensions</p>
             </div>
             <div className="flex gap-1.5">
-              {['bg-band-strong', 'bg-band-developing', 'bg-band-risk'].map((c) => (
+              {['bg-band-strong', 'bg-band-developing', 'bg-band-fragile', 'bg-band-risk'].map((c) => (
                 <div key={c} className={cn("w-2 h-2 rounded-full", c)} />
               ))}
             </div>
@@ -2445,6 +2446,113 @@ function ScoresPage({ id, assessmentId }) {
           </div>
         </GlassCard>
       </div>
+
+      {/* Growth System Diagnostic Overview */}
+      <GlassCard className="p-8 border-zinc-200/50 dark:border-zinc-800/50">
+        <h2 className="text-2xl font-black tracking-tight mb-6">
+          3. GROWTH SYSTEM <span className="text-primary italic">DIAGNOSTIC</span> OVERVIEW
+        </h2>
+
+        {/* Pillar Performance Matrix */}
+        <h3 className="text-lg font-bold tracking-tight mb-3">Pillar Performance Matrix</h3>
+        <div className="overflow-x-auto mb-6">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-primary text-white">
+                <th className="text-left px-4 py-2.5 font-bold">Pillar</th>
+                <th className="text-center px-4 py-2.5 font-bold">Weight</th>
+                <th className="text-center px-4 py-2.5 font-bold">Raw<br/>Avg</th>
+                <th className="text-center px-4 py-2.5 font-bold">Weighted<br/>Score</th>
+                <th className="text-center px-4 py-2.5 font-bold">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(scores.pillarScores || {}).map(([pid, data], i) => {
+                const weight = PILLAR_WEIGHTS[pid] || 0
+                const weightedScore = (data.score * weight).toFixed(1)
+                const status = data.score >= 80 ? 'STRONG' : data.score >= 60 ? 'DEVELOPING' : data.score >= 50 ? 'FRAGILE' : 'AT RISK'
+                const statusCls = data.score >= 80 ? 'bg-band-strong' : data.score >= 60 ? 'bg-band-developing' : data.score >= 50 ? 'bg-band-fragile' : 'bg-band-risk'
+                return (
+                  <tr key={pid} className={i % 2 === 0 ? 'bg-white dark:bg-zinc-950' : 'bg-zinc-50 dark:bg-zinc-900'}>
+                    <td className="px-4 py-2.5 font-medium">P{pid.replace('p', '')}. {PILLAR_NAMES[pid]}</td>
+                    <td className="text-center px-4 py-2.5">{(weight * 100).toFixed(0)}%</td>
+                    <td className="text-center px-4 py-2.5">{(data.avg || 0).toFixed(2)}/5.0</td>
+                    <td className="text-center px-4 py-2.5">
+                      <span className={cn("inline-block px-3 py-0.5 rounded font-bold text-white", statusCls, "bg-opacity-80")}>{weightedScore}</span>
+                    </td>
+                    <td className="text-center px-4 py-2.5">
+                      <span className={cn("text-white text-[10px] font-bold px-2.5 py-1 rounded", statusCls)}>{status}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+              {/* Overall Score Row */}
+              {(() => {
+                const totalWeightedScore = Object.entries(scores.pillarScores || {}).reduce((sum, [pid, data]) => sum + data.score * (PILLAR_WEIGHTS[pid] || 0), 0)
+                const overallScore = scores.radScore || totalWeightedScore
+                const overallStatus = overallScore >= 80 ? 'STRONG' : overallScore >= 60 ? 'DEVELOPING' : overallScore >= 50 ? 'FRAGILE' : 'AT RISK'
+                const overallCls = overallScore >= 80 ? 'bg-band-strong' : overallScore >= 60 ? 'bg-band-developing' : overallScore >= 50 ? 'bg-band-fragile' : 'bg-band-risk'
+                return (
+                  <tr className="bg-zinc-100 dark:bg-zinc-800 font-bold border-t-2 border-zinc-300 dark:border-zinc-600">
+                    <td className="px-4 py-2.5 font-black">OVERALL SCORE</td>
+                    <td className="text-center px-4 py-2.5">100%</td>
+                    <td className="text-center px-4 py-2.5"></td>
+                    <td className="text-center px-4 py-2.5">
+                      <span className={cn("inline-block px-3 py-0.5 rounded font-bold text-white", overallCls, "bg-opacity-80")}>{overallScore.toFixed(1)}</span>
+                    </td>
+                    <td className="text-center px-4 py-2.5">
+                      <span className={cn("text-white text-[10px] font-bold px-2.5 py-1 rounded", overallCls)}>{overallStatus}</span>
+                    </td>
+                  </tr>
+                )
+              })()}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Maturity Band Legend */}
+        <h3 className="text-lg font-bold tracking-tight mb-3">Maturity Band Legend</h3>
+        <div className="space-y-2 mb-8">
+          {[
+            { cls: 'bg-band-strong', label: 'STRONG \u226580%', desc: 'Pillar operating at competitive advantage level.' },
+            { cls: 'bg-band-developing', label: 'DEVELOPING 60\u201379%', desc: 'Pillar functional but lacks refinement.' },
+            { cls: 'bg-band-fragile', label: 'FRAGILE 50\u201359%', desc: 'Pillar shows weakness; requires intervention.' },
+            { cls: 'bg-band-risk', label: 'AT RISK <50%', desc: 'Pillar broken; impairs overall system performance.' },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center gap-3">
+              <span className={cn("text-white text-[10px] font-bold px-2.5 py-1 rounded whitespace-nowrap", item.cls)}>{item.label}</span>
+              <span className="text-sm text-muted-foreground">{item.desc}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Growth System Heatmap */}
+        <h3 className="text-lg font-bold tracking-tight mb-3">Growth System Heatmap</h3>
+        <div className="relative">
+          {/* Target line at 80% */}
+          <div className="absolute top-0 bottom-0 flex flex-col items-center" style={{ left: 'calc(40% + (60% * 0.8))' }}>
+            <span className="text-[10px] font-bold text-band-risk/60 whitespace-nowrap -translate-x-1/2 mb-1">Target (80%)</span>
+            <div className="w-px h-full border-l-2 border-dashed border-band-risk/40" />
+          </div>
+
+          <div className="space-y-2.5">
+            {Object.entries(scores.pillarScores || {}).map(([pid, data]) => {
+              const barCls = data.score >= 80 ? 'bg-band-strong' : data.score >= 60 ? 'bg-band-developing' : data.score >= 50 ? 'bg-band-fragile' : 'bg-band-risk'
+              return (
+                <div key={pid} className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-muted-foreground w-[40%] text-right truncate">P{pid.replace('p', '')}. {PILLAR_NAMES[pid]}</span>
+                  <div className="flex-1 flex items-center gap-2">
+                    <div className="flex-1 h-5 bg-zinc-100 dark:bg-zinc-800 rounded overflow-hidden relative">
+                      <div className={cn("h-full rounded transition-all duration-700", barCls)} style={{ width: `${data.score}%` }} />
+                    </div>
+                    <span className="text-xs font-bold tabular-nums w-12 text-right">{data.score.toFixed(1)}%</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </GlassCard>
 
       {/* RAPS & Detailed Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -2777,15 +2885,14 @@ export default function App() {
     // Track user activity
     function updateActivity() { sessionStorage.setItem('last_activity', Date.now().toString()) }
     updateActivity()
-    window.addEventListener('click', updateActivity)
-    window.addEventListener('keydown', updateActivity)
+    const activityEvents = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart']
+    activityEvents.forEach(evt => window.addEventListener(evt, updateActivity, { passive: true }))
     timeoutInterval = setInterval(checkSessionTimeout, 60000)
 
     return () => {
       subscription?.unsubscribe()
       clearInterval(timeoutInterval)
-      window.removeEventListener('click', updateActivity)
-      window.removeEventListener('keydown', updateActivity)
+      activityEvents.forEach(evt => window.removeEventListener(evt, updateActivity))
     }
   }, [])
 
