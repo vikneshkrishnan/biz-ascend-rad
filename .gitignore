@@ -18,6 +18,7 @@ node_modules/
 
 # Testing
 /coverage
+tests/test-results/
 
 # Next.js
 /.next/
@@ -56,6 +57,7 @@ chainlit.md
 .chainlit
 .ipynb_checkpoints/
 .ac
+.claude/
 
 # Deployment
 .vercel
