@@ -27,14 +27,29 @@ export async function checkForErrors(page: Page): Promise<string[]> {
 export async function enterDemoMode(page: Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  
+
   // Click on the Explore Demo button
   const demoButton = page.getByRole('button', { name: /Explore Demo/i });
   await expect(demoButton).toBeVisible();
   await demoButton.click();
-  
+
   // Wait for navigation to dashboard
   await expect(page.locator('h1')).toContainText('Dashboard');
+}
+
+export async function loginWithCredentials(page: Page, email: string, password: string) {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+
+  const emailInput = page.getByTestId('login-email-input');
+  await expect(emailInput).toBeVisible({ timeout: 10000 });
+  await emailInput.fill(email);
+
+  await page.getByTestId('login-password-input').fill(password);
+  await page.getByRole('button', { name: 'Sign In' }).click();
+
+  // Wait for navigation to dashboard
+  await expect(page.locator('h1')).toContainText('Dashboard', { timeout: 15000 });
 }
 
 export async function navigateToProjects(page: Page) {
