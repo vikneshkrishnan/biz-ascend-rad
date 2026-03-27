@@ -1,0 +1,224 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - img [ref=e7]
+        - generic [ref=e9]: Biz Ascend RAD™
+      - navigation [ref=e10]:
+        - button "Dashboard" [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+          - text: Dashboard
+        - button "Projects" [ref=e17] [cursor=pointer]:
+          - img [ref=e18]
+          - text: Projects
+        - button "Users" [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+          - text: Users
+        - button "Organization" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+          - text: Organization
+      - generic [ref=e31]:
+        - generic [ref=e32]: S
+        - generic [ref=e33]:
+          - paragraph [ref=e34]: Sanjiv
+          - paragraph [ref=e35]: admin
+    - generic [ref=e36]:
+      - banner [ref=e37]:
+        - button [ref=e39] [cursor=pointer]:
+          - img
+        - generic [ref=e40]:
+          - generic [ref=e41]: admin
+          - button "Logout" [ref=e42] [cursor=pointer]:
+            - img
+            - generic [ref=e43]: Logout
+      - main [ref=e44]:
+        - generic [ref=e46]:
+          - generic [ref=e48]:
+            - generic [ref=e49]:
+              - img [ref=e50]
+              - text: Executive Dashboard
+            - heading "Welcome, Sanjiv" [level=1] [ref=e55]
+            - paragraph [ref=e56]: Platform metrics are showing strong growth across all sectors.
+          - generic [ref=e57]:
+            - generic [ref=e59]:
+              - generic [ref=e60]:
+                - img [ref=e62]
+                - generic [ref=e64]:
+                  - img [ref=e65]
+                  - text: 12%
+              - generic [ref=e68]:
+                - paragraph [ref=e69]: Total Projects
+                - generic [ref=e70]:
+                  - paragraph [ref=e71]: "12"
+                  - img [ref=e73]
+            - generic [ref=e76]:
+              - generic [ref=e77]:
+                - img [ref=e79]
+                - generic [ref=e81]:
+                  - img [ref=e82]
+                  - text: 3%
+              - generic [ref=e85]:
+                - paragraph [ref=e86]: Incomplete Assessments
+                - generic [ref=e87]:
+                  - paragraph [ref=e88]: "9"
+                  - img [ref=e90]
+            - generic [ref=e93]:
+              - generic [ref=e94]:
+                - img [ref=e96]
+                - generic [ref=e99]:
+                  - img [ref=e100]
+                  - text: 8%
+              - generic [ref=e103]:
+                - paragraph [ref=e104]: Completed
+                - generic [ref=e105]:
+                  - paragraph [ref=e106]: "3"
+                  - img [ref=e108]
+            - generic [ref=e111]:
+              - generic [ref=e112]:
+                - img [ref=e114]
+                - generic [ref=e118]:
+                  - img [ref=e119]
+                  - text: 5%
+              - generic [ref=e122]:
+                - paragraph [ref=e123]: Consultants
+                - generic [ref=e124]:
+                  - paragraph [ref=e125]: "4"
+                  - img [ref=e127]
+          - generic [ref=e129]:
+            - generic [ref=e131]:
+              - generic [ref=e132]:
+                - tablist [ref=e133]:
+                  - tab "Overview" [selected] [ref=e134] [cursor=pointer]
+                  - tab "Activity" [ref=e135] [cursor=pointer]
+                - button "Last 30 Days" [ref=e136] [cursor=pointer]:
+                  - text: Last 30 Days
+                  - img
+              - tabpanel "Overview" [ref=e137]:
+                - generic [ref=e139]:
+                  - generic [ref=e140]:
+                    - generic [ref=e141]:
+                      - generic [ref=e142]: Industry Distribution
+                      - generic [ref=e143]: Live breakdown of projects across key economic sectors
+                    - generic [ref=e144]: Real-time
+                  - img [ref=e148]:
+                    - generic [ref=e152]:
+                      - generic [ref=e154]: SaaS / Software Platforms
+                      - generic [ref=e156]: Artificial Intelligence
+                      - generic [ref=e158]: Cybersecurity
+                      - generic [ref=e160]: Fintech
+                      - generic [ref=e162]: Aerospace & Defence
+                      - generic [ref=e164]: Manufacturing
+                      - generic [ref=e166]: Education / EdTech
+                    - generic [ref=e168]:
+                      - generic [ref=e170]: "0"
+                      - generic [ref=e172]: "2"
+                      - generic [ref=e174]: "4"
+                      - generic [ref=e176]: "6"
+                      - generic [ref=e178]: "8"
+            - generic [ref=e196]:
+              - generic [ref=e197]:
+                - generic [ref=e198]:
+                  - generic [ref=e199]: Recent Projects
+                  - generic [ref=e200]: Your active diagnostic pipeline
+                - button [ref=e201] [cursor=pointer]:
+                  - img
+              - generic [ref=e202]:
+                - generic [ref=e206]:
+                  - generic [ref=e207] [cursor=pointer]:
+                    - generic [ref=e208]:
+                      - generic [ref=e209]:
+                        - heading "TechVision Global Pty Ltd" [level=4] [ref=e210]
+                        - paragraph [ref=e211]: SaaS / Software Platforms
+                      - generic [ref=e212]: in progress
+                    - generic [ref=e214]:
+                      - generic [ref=e215]: Diagnostic Score
+                      - generic [ref=e216]: In Progress
+                  - generic [ref=e220] [cursor=pointer]:
+                    - generic [ref=e221]:
+                      - generic [ref=e222]:
+                        - heading "NovaTech Solutions Pty Ltd" [level=4] [ref=e223]
+                        - paragraph [ref=e224]: SaaS / Software Platforms
+                      - generic [ref=e225]: in progress
+                    - generic [ref=e227]:
+                      - generic [ref=e228]: Diagnostic Score
+                      - generic [ref=e229]: In Progress
+                  - generic [ref=e233] [cursor=pointer]:
+                    - generic [ref=e234]:
+                      - generic [ref=e235]:
+                        - heading "Testing Company" [level=4] [ref=e236]
+                        - paragraph [ref=e237]: SaaS / Software Platforms
+                      - generic [ref=e238]: completed
+                    - generic [ref=e240]:
+                      - generic [ref=e241]: Diagnostic Score
+                      - generic [ref=e242]: 84/100
+                  - generic [ref=e246] [cursor=pointer]:
+                    - generic [ref=e247]:
+                      - generic [ref=e248]:
+                        - heading "ADVANCED SYSTEMS AUTOMATION" [level=4] [ref=e249]
+                        - paragraph [ref=e250]: Manufacturing
+                      - generic [ref=e251]: in progress
+                    - generic [ref=e253]:
+                      - generic [ref=e254]: Diagnostic Score
+                      - generic [ref=e255]: In Progress
+                  - generic [ref=e259] [cursor=pointer]:
+                    - generic [ref=e260]:
+                      - generic [ref=e261]:
+                        - heading "Facticity" [level=4] [ref=e262]
+                        - paragraph [ref=e263]: SaaS / Software Platforms
+                      - generic [ref=e264]: in progress
+                    - generic [ref=e266]:
+                      - generic [ref=e267]: Diagnostic Score
+                      - generic [ref=e268]: In Progress
+                  - generic [ref=e272] [cursor=pointer]:
+                    - generic [ref=e273]:
+                      - generic [ref=e274]:
+                        - heading "Stick Pte Ltd" [level=4] [ref=e275]
+                        - paragraph [ref=e276]: Education / EdTech
+                      - generic [ref=e277]: in progress
+                    - generic [ref=e279]:
+                      - generic [ref=e280]: Diagnostic Score
+                      - generic [ref=e281]: In Progress
+                  - generic [ref=e285] [cursor=pointer]:
+                    - generic [ref=e286]:
+                      - generic [ref=e287]:
+                        - heading "Company 1" [level=4] [ref=e288]
+                        - paragraph [ref=e289]: Manufacturing
+                      - generic [ref=e290]: in progress
+                    - generic [ref=e292]:
+                      - generic [ref=e293]: Diagnostic Score
+                      - generic [ref=e294]: In Progress
+                  - generic [ref=e298] [cursor=pointer]:
+                    - generic [ref=e299]:
+                      - generic [ref=e300]:
+                        - heading "SkyForge Aerospace" [level=4] [ref=e301]
+                        - paragraph [ref=e302]: Aerospace & Defence
+                      - generic [ref=e303]: in progress
+                    - generic [ref=e305]:
+                      - generic [ref=e306]: Diagnostic Score
+                      - generic [ref=e307]: In Progress
+                  - generic [ref=e311] [cursor=pointer]:
+                    - generic [ref=e312]:
+                      - generic [ref=e313]:
+                        - heading "PayStream Financial" [level=4] [ref=e314]
+                        - paragraph [ref=e315]: Fintech
+                      - generic [ref=e316]: in progress
+                    - generic [ref=e318]:
+                      - generic [ref=e319]: Diagnostic Score
+                      - generic [ref=e320]: In Progress
+                  - generic [ref=e324] [cursor=pointer]:
+                    - generic [ref=e325]:
+                      - generic [ref=e326]:
+                        - heading "ShieldGuard Security" [level=4] [ref=e327]
+                        - paragraph [ref=e328]: Cybersecurity
+                      - generic [ref=e329]: completed
+                    - generic [ref=e331]:
+                      - generic [ref=e332]: Diagnostic Score
+                      - generic [ref=e333]: 84/100
+                - button "See all 12 projects" [ref=e338] [cursor=pointer]
+  - region "Notifications alt+T"
+  - generic [ref=e339]: "0"
+```

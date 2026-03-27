@@ -1,7 +1,7 @@
 {
   "config": {
-    "configFile": "/app/tests/playwright.config.ts",
-    "rootDir": "/app/tests/e2e",
+    "configFile": "/Users/viknesh/workspace/biz-ascend-rad/tests/playwright.config.ts",
+    "rootDir": "/Users/viknesh/workspace/biz-ascend-rad/tests/e2e",
     "forbidOnly": false,
     "fullyParallel": false,
     "globalSetup": null,
@@ -10,17 +10,21 @@
     "grep": {},
     "grepInvert": null,
     "maxFailures": 0,
-    "metadata": {},
+    "metadata": {
+      "actualWorkers": 1
+    },
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "/app/tests/test-results",
+        "outputDir": "/Users/viknesh/workspace/biz-ascend-rad/tests/test-results",
         "repeatEach": 1,
         "retries": 1,
-        "metadata": {},
+        "metadata": {
+          "actualWorkers": 1
+        },
         "id": "chromium",
         "name": "chromium",
-        "testDir": "/app/tests/e2e",
+        "testDir": "/Users/viknesh/workspace/biz-ascend-rad/tests/e2e",
         "testIgnore": [],
         "testMatch": [
           "**/*.@(spec|test).?(c|m)[jt]s?(x)"
@@ -56,501 +60,143 @@
   },
   "suites": [
     {
-      "title": "core-flows.spec.ts",
-      "file": "core-flows.spec.ts",
+      "title": "fill-screener.spec.ts",
+      "file": "fill-screener.spec.ts",
       "column": 0,
       "line": 0,
-      "specs": [],
-      "suites": [
+      "specs": [
         {
-          "title": "Biz Ascend RAD - Demo Mode and Core Navigation",
-          "file": "core-flows.spec.ts",
-          "line": 4,
-          "column": 6,
-          "specs": [
+          "title": "Fill screener form with real data for NovaTech Solutions",
+          "ok": false,
+          "tags": [],
+          "tests": [
             {
-              "title": "Login page displays correctly",
-              "ok": true,
-              "tags": [],
-              "tests": [
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
                 {
-                  "timeout": 60000,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 26914,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeEnabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('button', { name: /Proceed to Phase/i })\nExpected: enabled\nReceived: disabled\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeEnabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /Proceed to Phase/i })\u001b[22m\n\u001b[2m    14 × locator resolved to <button disabled class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 py-2 rounded-2xl font-bold h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"disabled\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeEnabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('button', { name: /Proceed to Phase/i })\nExpected: enabled\nReceived: disabled\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeEnabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /Proceed to Phase/i })\u001b[22m\n\u001b[2m    14 × locator resolved to <button disabled class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 py-2 rounded-2xl font-bold h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"disabled\"\u001b[22m\n\n    at nextSection (/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts:38:27)\n    at /Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts:73:3",
+                    "location": {
+                      "file": "/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts",
+                      "column": 27,
+                      "line": 38
+                    },
+                    "snippet": "  36 |     await page.waitForTimeout(1500);\n  37 |     const nextBtn = page.getByRole('button', { name: /Proceed to Phase/i });\n> 38 |     await expect(nextBtn).toBeEnabled({ timeout: 10000 });\n     |                           ^\n  39 |     await nextBtn.click();\n  40 |     await page.waitForTimeout(500);\n  41 |   }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts",
+                        "column": 27,
+                        "line": 38
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeEnabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  getByRole('button', { name: /Proceed to Phase/i })\nExpected: enabled\nReceived: disabled\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeEnabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /Proceed to Phase/i })\u001b[22m\n\u001b[2m    14 × locator resolved to <button disabled class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 py-2 rounded-2xl font-bold h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2\">…</button>\u001b[22m\n\u001b[2m       - unexpected value \"disabled\"\u001b[22m\n\n\n  36 |     await page.waitForTimeout(1500);\n  37 |     const nextBtn = page.getByRole('button', { name: /Proceed to Phase/i });\n> 38 |     await expect(nextBtn).toBeEnabled({ timeout: 10000 });\n     |                           ^\n  39 |     await nextBtn.click();\n  40 |     await page.waitForTimeout(500);\n  41 |   }\n    at nextSection (/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts:38:27)\n    at /Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts:73:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-03-26T06:55:46.172Z",
                   "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/viknesh/workspace/biz-ascend-rad/tests/test-results/fill-screener-Fill-screene-39e8f-data-for-NovaTech-Solutions-chromium/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/viknesh/workspace/biz-ascend-rad/tests/test-results/fill-screener-Fill-screene-39e8f-data-for-NovaTech-Solutions-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts",
+                    "column": 27,
+                    "line": 38
+                  }
+                },
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 25383,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeEnabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: /Proceed to Phase/i })\nExpected: enabled\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeEnabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /Proceed to Phase/i })\u001b[22m\n\u001b[2m    9 × locator resolved to <button disabled class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 py-2 rounded-2xl font-bold h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"disabled\"\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeEnabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: /Proceed to Phase/i })\nExpected: enabled\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeEnabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /Proceed to Phase/i })\u001b[22m\n\u001b[2m    9 × locator resolved to <button disabled class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 py-2 rounded-2xl font-bold h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"disabled\"\u001b[22m\n\n    at nextSection (/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts:38:27)\n    at /Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts:73:3",
+                    "location": {
+                      "file": "/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts",
+                      "column": 27,
+                      "line": 38
+                    },
+                    "snippet": "  36 |     await page.waitForTimeout(1500);\n  37 |     const nextBtn = page.getByRole('button', { name: /Proceed to Phase/i });\n> 38 |     await expect(nextBtn).toBeEnabled({ timeout: 10000 });\n     |                           ^\n  39 |     await nextBtn.click();\n  40 |     await page.waitForTimeout(500);\n  41 |   }"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts",
+                        "column": 27,
+                        "line": 38
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeEnabled\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: /Proceed to Phase/i })\nExpected: enabled\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeEnabled\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: /Proceed to Phase/i })\u001b[22m\n\u001b[2m    9 × locator resolved to <button disabled class=\"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 py-2 rounded-2xl font-bold h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2\">…</button>\u001b[22m\n\u001b[2m      - unexpected value \"disabled\"\u001b[22m\n\n\n  36 |     await page.waitForTimeout(1500);\n  37 |     const nextBtn = page.getByRole('button', { name: /Proceed to Phase/i });\n> 38 |     await expect(nextBtn).toBeEnabled({ timeout: 10000 });\n     |                           ^\n  39 |     await nextBtn.click();\n  40 |     await page.waitForTimeout(500);\n  41 |   }\n    at nextSection (/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts:38:27)\n    at /Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts:73:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 1,
+                  "startTime": "2026-03-26T06:56:15.981Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/Users/viknesh/workspace/biz-ascend-rad/tests/test-results/fill-screener-Fill-screene-39e8f-data-for-NovaTech-Solutions-chromium-retry1/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/viknesh/workspace/biz-ascend-rad/tests/test-results/fill-screener-Fill-screene-39e8f-data-for-NovaTech-Solutions-chromium-retry1/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/Users/viknesh/workspace/biz-ascend-rad/tests/test-results/fill-screener-Fill-screene-39e8f-data-for-NovaTech-Solutions-chromium-retry1/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/viknesh/workspace/biz-ascend-rad/tests/e2e/fill-screener.spec.ts",
+                    "column": 27,
+                    "line": 38
+                  }
                 }
               ],
-              "id": "28695e5e3430c54ac89e-6029fb384595347c7a27",
-              "file": "core-flows.spec.ts",
-              "line": 9,
-              "column": 7
-            },
-            {
-              "title": "Click Explore Demo enters demo mode and shows dashboard",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "28695e5e3430c54ac89e-e355406843ffe0feebe7",
-              "file": "core-flows.spec.ts",
-              "line": 22,
-              "column": 7
-            },
-            {
-              "title": "Dashboard displays stats cards correctly",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "28695e5e3430c54ac89e-96cb6e4762d30f3fcf50",
-              "file": "core-flows.spec.ts",
-              "line": 41,
-              "column": 7
-            },
-            {
-              "title": "Theme toggle switches between dark and light modes",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "28695e5e3430c54ac89e-9e5ef17e052acc187ea0",
-              "file": "core-flows.spec.ts",
-              "line": 55,
-              "column": 7
-            },
-            {
-              "title": "Navigation to Projects page works",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "28695e5e3430c54ac89e-4bb37eeeda428c665463",
-              "file": "core-flows.spec.ts",
-              "line": 92,
-              "column": 7
+              "status": "unexpected"
             }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "forgot-password.spec.ts",
-      "file": "forgot-password.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [],
-      "suites": [
-        {
-          "title": "Forgot Password Flow",
-          "file": "forgot-password.spec.ts",
-          "line": 4,
-          "column": 6,
-          "specs": [
-            {
-              "title": "Login page displays Forgot Password link",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "852acb1e2419f9f859ad-806511c3f5e3db5b6068",
-              "file": "forgot-password.spec.ts",
-              "line": 9,
-              "column": 7
-            },
-            {
-              "title": "Clicking Forgot Password link shows reset password form",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "852acb1e2419f9f859ad-0dc61c7f92e2c9257a05",
-              "file": "forgot-password.spec.ts",
-              "line": 19,
-              "column": 7
-            },
-            {
-              "title": "Entering email and clicking Send Reset Link shows success state",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "852acb1e2419f9f859ad-2f9c8abc1c5b9e45a98c",
-              "file": "forgot-password.spec.ts",
-              "line": 46,
-              "column": 7
-            },
-            {
-              "title": "Back to Login button returns to login page",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "852acb1e2419f9f859ad-7f87e96a8c39b541946a",
-              "file": "forgot-password.spec.ts",
-              "line": 77,
-              "column": 7
-            },
-            {
-              "title": "Try another email button resets form after success",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "852acb1e2419f9f859ad-fd716b5dd4dd8a926645",
-              "file": "forgot-password.spec.ts",
-              "line": 97,
-              "column": 7
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "projects.spec.ts",
-      "file": "projects.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [],
-      "suites": [
-        {
-          "title": "Projects List and Navigation",
-          "file": "projects.spec.ts",
-          "line": 4,
-          "column": 6,
-          "specs": [
-            {
-              "title": "Projects list shows projects with correct status",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "3a2958b1096c5d9a8472-865c9e77ffc6c569ff6c",
-              "file": "projects.spec.ts",
-              "line": 9,
-              "column": 7
-            },
-            {
-              "title": "Project detail page displays correctly",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "3a2958b1096c5d9a8472-73358b0a9f92c231b4d8",
-              "file": "projects.spec.ts",
-              "line": 27,
-              "column": 7
-            },
-            {
-              "title": "Navigate to scores page from project detail",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "3a2958b1096c5d9a8472-ffe7a3718544dad258bd",
-              "file": "projects.spec.ts",
-              "line": 51,
-              "column": 7
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "scores-report.spec.ts",
-      "file": "scores-report.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [],
-      "suites": [
-        {
-          "title": "Scores Page and AI Report Generation",
-          "file": "scores-report.spec.ts",
-          "line": 4,
-          "column": 6,
-          "specs": [
-            {
-              "title": "Scores page shows RAD score, pillar breakdown, and RAPS",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "94e95223fdfaddbd235f-57622df47d193652ccd7",
-              "file": "scores-report.spec.ts",
-              "line": 9,
-              "column": 7
-            },
-            {
-              "title": "AI Report Generation button exists and is clickable",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "94e95223fdfaddbd235f-8ea6c6565de8a455463c",
-              "file": "scores-report.spec.ts",
-              "line": 40,
-              "column": 7
-            },
-            {
-              "title": "View Report button displays the report dialog",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "94e95223fdfaddbd235f-d6f5fedf54235830d050",
-              "file": "scores-report.spec.ts",
-              "line": 59,
-              "column": 7
-            },
-            {
-              "title": "Report dialog shows Executive Summary and Pillar Analysis when opened after generation",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "94e95223fdfaddbd235f-b35d618b6a66b32b7071",
-              "file": "scores-report.spec.ts",
-              "line": 88,
-              "column": 7
-            },
-            {
-              "title": "Radar chart displays pillar performance visualization",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "94e95223fdfaddbd235f-7683530f6699681de203",
-              "file": "scores-report.spec.ts",
-              "line": 112,
-              "column": 7
-            },
-            {
-              "title": "Score Trend line chart displays RAD Score and RAPS progression for projects with multiple assessments",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "94e95223fdfaddbd235f-6351162c95540020abcd",
-              "file": "scores-report.spec.ts",
-              "line": 136,
-              "column": 7
-            },
-            {
-              "title": "Download PDF button exists and is clickable",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "94e95223fdfaddbd235f-953f4a583dc49c6f4147",
-              "file": "scores-report.spec.ts",
-              "line": 161,
-              "column": 7
-            },
-            {
-              "title": "Report dialog shows Action Plan section",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 60000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [],
-                  "status": "skipped"
-                }
-              ],
-              "id": "94e95223fdfaddbd235f-e9ea1bb1e4781b3552a6",
-              "file": "scores-report.spec.ts",
-              "line": 180,
-              "column": 7
-            }
-          ]
+          ],
+          "id": "6af6335bcf2f438161a7-930bdbbb7637f96d06df",
+          "file": "fill-screener.spec.ts",
+          "line": 5,
+          "column": 5
         }
       ]
     }
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-03-11T01:52:57.289Z",
-    "duration": 37.500999999999976,
+    "startTime": "2026-03-26T06:55:45.741Z",
+    "duration": 56588.51,
     "expected": 0,
-    "skipped": 21,
-    "unexpected": 0,
+    "skipped": 0,
+    "unexpected": 1,
     "flaky": 0
   }
 }

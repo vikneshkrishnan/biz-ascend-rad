@@ -1,0 +1,101 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - img [ref=e7]
+        - generic [ref=e9]: Biz Ascend RAD™
+      - navigation [ref=e10]:
+        - button "Dashboard" [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+          - text: Dashboard
+        - button "Projects" [ref=e17] [cursor=pointer]:
+          - img [ref=e18]
+          - text: Projects
+        - button "Users" [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+          - text: Users
+        - button "Organization" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+          - text: Organization
+      - generic [ref=e31]:
+        - generic [ref=e32]: S
+        - generic [ref=e33]:
+          - paragraph [ref=e34]: Sanjiv
+          - paragraph [ref=e35]: admin
+    - generic [ref=e36]:
+      - banner [ref=e37]:
+        - button [ref=e39] [cursor=pointer]:
+          - img
+        - generic [ref=e40]:
+          - generic [ref=e41]: admin
+          - button "Logout" [ref=e42] [cursor=pointer]:
+            - img
+            - generic [ref=e43]: Logout
+      - main [ref=e44]:
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - generic [ref=e48]:
+              - button "Portfolio" [ref=e49] [cursor=pointer]
+              - img [ref=e50]
+              - button "Project" [ref=e52] [cursor=pointer]
+              - img [ref=e53]
+              - generic [ref=e55]: Screener
+            - generic [ref=e57]:
+              - img [ref=e58]
+              - generic [ref=e61]: Draft Auto-Saving
+          - generic [ref=e62]:
+            - generic [ref=e63]:
+              - generic [ref=e64]:
+                - img [ref=e65]
+                - text: "Phase 01: Strategic Screener"
+              - heading "Capture Business Context" [level=1] [ref=e68]
+              - paragraph [ref=e69]: Please provide accurate details about the organization's current operations to prime the RAD™ engine for deeper diagnostic analysis.
+            - generic [ref=e71]:
+              - generic [ref=e72]: Overall Progress
+              - generic [ref=e73]: 57% Complete
+          - generic [ref=e85]:
+            - generic [ref=e87]:
+              - generic [ref=e88]: "04"
+              - generic [ref=e89]:
+                - generic [ref=e90]: Go-To-Market Context
+                - generic [ref=e91]: Section 4 of 7
+            - generic [ref=e93]:
+              - generic [ref=e95]:
+                - text: Primary GTM Channels
+                - generic [ref=e96]: "*"
+              - generic [ref=e98]:
+                - generic [ref=e99] [cursor=pointer]:
+                  - checkbox "Cold outreach" [ref=e100]
+                  - generic [ref=e101]: Cold outreach
+                - generic [ref=e102] [cursor=pointer]:
+                  - checkbox "Paid advertising" [ref=e103]
+                  - generic [ref=e104]: Paid advertising
+                - generic [ref=e105] [cursor=pointer]:
+                  - checkbox "Content/inbound marketing" [ref=e106]
+                  - generic [ref=e107]: Content/inbound marketing
+                - generic [ref=e108] [cursor=pointer]:
+                  - checkbox "Events/trade shows" [ref=e109]
+                  - generic [ref=e110]: Events/trade shows
+                - generic [ref=e111] [cursor=pointer]:
+                  - checkbox "Partnerships/channel" [active] [ref=e112]
+                  - generic [ref=e113]: Partnerships/channel
+                - generic [ref=e114] [cursor=pointer]:
+                  - checkbox "Networking/referrals" [ref=e115]
+                  - generic [ref=e116]: Networking/referrals
+                - generic [ref=e117] [cursor=pointer]:
+                  - checkbox "Others" [ref=e118]
+                  - generic [ref=e119]: Others
+            - generic [ref=e120]:
+              - button "Strategic Backtrack" [ref=e121] [cursor=pointer]:
+                - img
+                - text: Strategic Backtrack
+              - button "Proceed to Phase 05" [disabled]:
+                - text: Proceed to Phase 05
+                - img
+  - region "Notifications alt+T"
+  - generic [ref=e122]: "0"
+```

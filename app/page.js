@@ -35,6 +35,7 @@ import { DEMO_PROFILE, DEMO_USERS, DEMO_PROJECTS, DEMO_STATS, DEMO_ACTIVITY, dem
 import { cn, getMaturityBand } from '@/lib/utils'
 import { generateClientPdf } from '@/lib/generatePdf'
 import { validatePassword } from '@/lib/passwordValidation'
+import { ReportGenerationDialog } from '@/components/scores/ReportGenerationDialog'
 
 const pillarLabel = (pid) => `Pillar ${pid.replace('p', '')} - ${PILLAR_NAMES[pid] || pid}`
 import { GlassCard, StatCard, GlowEffect, StatusBadge as UIStatusBadge, PageSkeleton as UIPageSkeleton } from '@/components/shared/ui-helpers'
@@ -53,11 +54,28 @@ async function apiFetch(path, options = {}) {
     }
     return demoApiFetch(path)
   }
-  const { data: { session } } = await supabase.auth.getSession()
-  const token = session?.access_token
-  const fetchOptions = { method: options.method || 'GET', headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) } }
-  if (options.body) fetchOptions.body = JSON.stringify(options.body)
-  const res = await fetch(`/api${path}`, fetchOptions)
+  async function getValidToken() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token || null
+  }
+  async function doFetch(token) {
+    const fetchOptions = { method: options.method || 'GET', headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) } }
+    if (options.body) fetchOptions.body = JSON.stringify(options.body)
+    return fetch(`/api${path}`, fetchOptions)
+  }
+  let token = await getValidToken()
+  let res = await doFetch(token)
+  if (res.status === 401) {
+    const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession()
+    if (!refreshErr && refreshData.session) {
+      token = refreshData.session.access_token
+      res = await doFetch(token)
+    } else {
+      await supabase.auth.signOut()
+      window.location.hash = '#/login'
+      throw new Error('Session expired — please sign in again')
+    }
+  }
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Something went wrong')
   return data
@@ -2024,7 +2042,7 @@ function DiagnosticPage({ id }) {
     saveTimeout.current = setTimeout(async () => {
       setSaving(true)
       try { await apiFetch(`/projects/${id}/diagnostic`, { method: 'PUT', body: { responses: newResponses } }); setSaved(true); setTimeout(() => setSaved(false), 2000) }
-      catch (e) { toast.error('Failed to save') } finally { setSaving(false) }
+      catch (e) { toast.error(e.message || 'Failed to save') } finally { setSaving(false) }
     }, 800)
   }
 
@@ -2268,16 +2286,19 @@ function ScoresPage({ id, assessmentId }) {
   const { data: scores, isLoading: scoresLoading } = useQuery({ queryKey: ['scores', id, assessmentId], queryFn: () => apiFetch(scoresUrl) })
   const { data: project, isLoading: projectLoading } = useQuery({ queryKey: ['project', id], queryFn: () => apiFetch(`/projects/${id}`) })
   const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [reportDialogState, setReportDialogState] = useState(null)
+  const [reportError, setReportError] = useState(null)
 
   async function downloadPdf() {
     setDownloadingPdf(true)
+    setReportDialogState('generating')
+    setReportError(null)
     try {
       let reportData = null
       try {
         reportData = await apiFetch(`/projects/${id}/report`)
       } catch (e) {
         // No report exists yet — generate it via AI
-        toast.info('Generating AI Intelligence Report... this may take up to 60 seconds.')
         reportData = await apiFetch(`/projects/${id}/report/generate`, { method: 'POST' })
       }
       await generateClientPdf({
@@ -2287,9 +2308,11 @@ function ScoresPage({ id, assessmentId }) {
         screenerResponses: reportData?.screener_responses || {},
         diagnosticResponses: reportData?.diagnostic_responses || {},
       })
-      toast.success('Executive PDF Exported')
+      setReportDialogState('success')
+      setTimeout(() => setReportDialogState(null), 1500)
     } catch (err) {
-      toast.error('Report generation failed: ' + (err.message || 'Unknown error'))
+      setReportError(err.message || 'Unknown error')
+      setReportDialogState('error')
     } finally {
       setDownloadingPdf(false)
     }
@@ -2345,9 +2368,14 @@ function ScoresPage({ id, assessmentId }) {
 
   return (
     <div className="relative space-y-8 bg-transparent px-2 max-w-6xl mx-auto pb-20">
+      <ReportGenerationDialog
+        state={reportDialogState}
+        error={reportError}
+        onClose={() => { setReportDialogState(null); setReportError(null) }}
+      />
       {/* Decorative Background Elements */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10" />
-      
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs font-bold tracking-[0.2em] uppercase text-muted-foreground/60">
           <button onClick={() => navigate('/projects')} className="hover:text-primary hover:underline cursor-pointer transition-colors">Portfolio</button>
@@ -2447,112 +2475,8 @@ function ScoresPage({ id, assessmentId }) {
         </GlassCard>
       </div>
 
-      {/* Growth System Diagnostic Overview */}
-      <GlassCard className="p-8 border-zinc-200/50 dark:border-zinc-800/50">
-        <h2 className="text-2xl font-black tracking-tight mb-6">
-          3. GROWTH SYSTEM <span className="text-primary italic">DIAGNOSTIC</span> OVERVIEW
-        </h2>
 
-        {/* Pillar Performance Matrix */}
-        <h3 className="text-lg font-bold tracking-tight mb-3">Pillar Performance Matrix</h3>
-        <div className="overflow-x-auto mb-6">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-primary text-white">
-                <th className="text-left px-4 py-2.5 font-bold">Pillar</th>
-                <th className="text-center px-4 py-2.5 font-bold">Weight</th>
-                <th className="text-center px-4 py-2.5 font-bold">Raw<br/>Avg</th>
-                <th className="text-center px-4 py-2.5 font-bold">Weighted<br/>Score</th>
-                <th className="text-center px-4 py-2.5 font-bold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(scores.pillarScores || {}).map(([pid, data], i) => {
-                const weight = PILLAR_WEIGHTS[pid] || 0
-                const weightedScore = (data.score * weight).toFixed(1)
-                const status = data.score >= 80 ? 'STRONG' : data.score >= 60 ? 'DEVELOPING' : data.score >= 50 ? 'FRAGILE' : 'AT RISK'
-                const statusCls = data.score >= 80 ? 'bg-band-strong' : data.score >= 60 ? 'bg-band-developing' : data.score >= 50 ? 'bg-band-fragile' : 'bg-band-risk'
-                return (
-                  <tr key={pid} className={i % 2 === 0 ? 'bg-white dark:bg-zinc-950' : 'bg-zinc-50 dark:bg-zinc-900'}>
-                    <td className="px-4 py-2.5 font-medium">P{pid.replace('p', '')}. {PILLAR_NAMES[pid]}</td>
-                    <td className="text-center px-4 py-2.5">{(weight * 100).toFixed(0)}%</td>
-                    <td className="text-center px-4 py-2.5">{(data.avg || 0).toFixed(2)}/5.0</td>
-                    <td className="text-center px-4 py-2.5">
-                      <span className={cn("inline-block px-3 py-0.5 rounded font-bold text-white", statusCls, "bg-opacity-80")}>{weightedScore}</span>
-                    </td>
-                    <td className="text-center px-4 py-2.5">
-                      <span className={cn("text-white text-[10px] font-bold px-2.5 py-1 rounded", statusCls)}>{status}</span>
-                    </td>
-                  </tr>
-                )
-              })}
-              {/* Overall Score Row */}
-              {(() => {
-                const totalWeightedScore = Object.entries(scores.pillarScores || {}).reduce((sum, [pid, data]) => sum + data.score * (PILLAR_WEIGHTS[pid] || 0), 0)
-                const overallScore = scores.radScore || totalWeightedScore
-                const overallStatus = overallScore >= 80 ? 'STRONG' : overallScore >= 60 ? 'DEVELOPING' : overallScore >= 50 ? 'FRAGILE' : 'AT RISK'
-                const overallCls = overallScore >= 80 ? 'bg-band-strong' : overallScore >= 60 ? 'bg-band-developing' : overallScore >= 50 ? 'bg-band-fragile' : 'bg-band-risk'
-                return (
-                  <tr className="bg-zinc-100 dark:bg-zinc-800 font-bold border-t-2 border-zinc-300 dark:border-zinc-600">
-                    <td className="px-4 py-2.5 font-black">OVERALL SCORE</td>
-                    <td className="text-center px-4 py-2.5">100%</td>
-                    <td className="text-center px-4 py-2.5"></td>
-                    <td className="text-center px-4 py-2.5">
-                      <span className={cn("inline-block px-3 py-0.5 rounded font-bold text-white", overallCls, "bg-opacity-80")}>{overallScore.toFixed(1)}</span>
-                    </td>
-                    <td className="text-center px-4 py-2.5">
-                      <span className={cn("text-white text-[10px] font-bold px-2.5 py-1 rounded", overallCls)}>{overallStatus}</span>
-                    </td>
-                  </tr>
-                )
-              })()}
-            </tbody>
-          </table>
-        </div>
 
-        {/* Maturity Band Legend */}
-        <h3 className="text-lg font-bold tracking-tight mb-3">Maturity Band Legend</h3>
-        <div className="space-y-2 mb-8">
-          {[
-            { cls: 'bg-band-strong', label: 'STRONG \u226580%', desc: 'Pillar operating at competitive advantage level.' },
-            { cls: 'bg-band-developing', label: 'DEVELOPING 60\u201379%', desc: 'Pillar functional but lacks refinement.' },
-            { cls: 'bg-band-fragile', label: 'FRAGILE 50\u201359%', desc: 'Pillar shows weakness; requires intervention.' },
-            { cls: 'bg-band-risk', label: 'AT RISK <50%', desc: 'Pillar broken; impairs overall system performance.' },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-3">
-              <span className={cn("text-white text-[10px] font-bold px-2.5 py-1 rounded whitespace-nowrap", item.cls)}>{item.label}</span>
-              <span className="text-sm text-muted-foreground">{item.desc}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Growth System Heatmap */}
-        <h3 className="text-lg font-bold tracking-tight mb-3">Growth System Heatmap</h3>
-        <div className="relative">
-          {/* Target line at 80% */}
-          <div className="absolute top-0 bottom-0 flex flex-col items-center" style={{ left: 'calc(40% + (60% * 0.8))' }}>
-            <span className="text-[10px] font-bold text-band-risk/60 whitespace-nowrap -translate-x-1/2 mb-1">Target (80%)</span>
-            <div className="w-px h-full border-l-2 border-dashed border-band-risk/40" />
-          </div>
-
-          <div className="space-y-2.5">
-            {Object.entries(scores.pillarScores || {}).map(([pid, data]) => {
-              const barCls = data.score >= 80 ? 'bg-band-strong' : data.score >= 60 ? 'bg-band-developing' : data.score >= 50 ? 'bg-band-fragile' : 'bg-band-risk'
-              return (
-                <div key={pid} className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-muted-foreground w-[40%] text-right truncate">P{pid.replace('p', '')}. {PILLAR_NAMES[pid]}</span>
-                  <div className="flex-1 flex items-center gap-2">
-                    <div className="flex-1 h-5 bg-zinc-100 dark:bg-zinc-800 rounded overflow-hidden relative">
-                      <div className={cn("h-full rounded transition-all duration-700", barCls)} style={{ width: `${data.score}%` }} />
-                    </div>
-                    <span className="text-xs font-bold tabular-nums w-12 text-right">{data.score.toFixed(1)}%</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </GlassCard>
 
       {/* RAPS & Detailed Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
