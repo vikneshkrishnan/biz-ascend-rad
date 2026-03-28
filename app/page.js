@@ -66,14 +66,23 @@ async function apiFetch(path, options = {}) {
   let token = await getValidToken()
   let res = await doFetch(token)
   if (res.status === 401) {
-    const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession()
+    // First refresh attempt
+    let { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession()
     if (!refreshErr && refreshData.session) {
       token = refreshData.session.access_token
       res = await doFetch(token)
     } else {
-      await supabase.auth.signOut()
-      window.location.hash = '#/login'
-      throw new Error('Session expired — please sign in again')
+      // Retry once after a short delay (handles transient failures / rate limits)
+      await new Promise(r => setTimeout(r, 1000))
+      ;({ data: refreshData, error: refreshErr } = await supabase.auth.refreshSession())
+      if (!refreshErr && refreshData.session) {
+        token = refreshData.session.access_token
+        res = await doFetch(token)
+      } else {
+        await supabase.auth.signOut()
+        window.location.hash = '#/login'
+        throw new Error('Session expired — please sign in again')
+      }
     }
   }
   const data = await res.json()
@@ -2811,12 +2820,18 @@ export default function App() {
     updateActivity()
     const activityEvents = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart']
     activityEvents.forEach(evt => window.addEventListener(evt, updateActivity, { passive: true }))
+    // Also track tab visibility — user returning to tab or page becoming visible counts as activity
+    function onVisibilityChange() { if (document.visibilityState === 'visible') updateActivity() }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', updateActivity)
     timeoutInterval = setInterval(checkSessionTimeout, 60000)
 
     return () => {
       subscription?.unsubscribe()
       clearInterval(timeoutInterval)
       activityEvents.forEach(evt => window.removeEventListener(evt, updateActivity))
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', updateActivity)
     }
   }, [])
 
